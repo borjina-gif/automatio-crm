@@ -1,0 +1,531 @@
+// ============================================================
+// Automatio CRM — Prisma Schema
+// PostgreSQL · UUIDs · Amounts in cents · Soft delete
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum TaxType {
+  IVA
+  IRPF
+  RECARGO_EQUIVALENCIA
+  EXENTO
+  INTRACOMUNITARIO
+}
+
+enum DocType {
+  QUOTE
+  INVOICE
+  CREDIT_NOTE
+  PURCHASE_INVOICE
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum InvoiceType {
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum PurchaseInvoiceStatus {
+  DRAFT
+  BOOKED
+  PAID
+}
+
+enum PaymentDirection {
+  IN
+  OUT
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CASH
+  CARD
+  OTHER
+}
+
+enum RecurringFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RecurringTemplateStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum RecurringRunStatus {
+  GENERATED
+  REVIEWED
+  ISSUED
+  SKIPPED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  STATUS_CHANGE
+  EMIT
+  SEND
+  DELETE
+  CONVERT
+  PAYMENT
+}
+
+// ─── USERS ──────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  name          String   @default("")
+  role          UserRole @default(ADMIN)
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+// ─── COMPANY ────────────────────────────────────────────────
+
+model Company {
+  id            String   @id @default(uuid()) @db.Uuid
+  legalName     String   @map("legal_name")
+  tradeName     String?  @map("trade_name")
+  taxId         String?  @map("tax_id")
+  addressLine1  String?  @map("address_line1")
+  addressLine2  String?  @map("address_line2")
+  city          String?
+  postalCode    String?  @map("postal_code")
+  province      String?
+  country       String   @default("ES")
+  email         String?
+  phone         String?
+  bankIban      String?  @map("bank_iban")
+  logoUrl       String?  @map("logo_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  clients            Client[]
+  providers          Provider[]
+  services           Service[]
+  taxes              Tax[]
+  documentCounters   DocumentCounter[]
+  quotes             Quote[]
+  invoices           Invoice[]
+  purchaseInvoices   PurchaseInvoice[]
+  payments           Payment[]
+  recurringTemplates RecurringTemplate[]
+  activityLogs       ActivityLog[]
+
+  @@map("company")
+}
+
+// ─── CLIENTS ────────────────────────────────────────────────
+
+model Client {
+  id                    String   @id @default(uuid()) @db.Uuid
+  companyId             String   @map("company_id") @db.Uuid
+  name                  String
+  taxId                 String?  @map("tax_id")
+  email                 String?
+  phone                 String?
+  billingAddressLine1   String?  @map("billing_address_line1")
+  billingAddressLine2   String?  @map("billing_address_line2")
+  billingCity           String?  @map("billing_city")
+  billingPostalCode     String?  @map("billing_postal_code")
+  billingProvince       String?  @map("billing_province")
+  billingCountry        String?  @map("billing_country")
+  paymentTermsDays      Int      @default(30) @map("payment_terms_days")
+  defaultPaymentMethod  PaymentMethod @default(TRANSFER) @map("default_payment_method")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  company              Company  @relation(fields: [companyId], references: [id])
+  quotes               Quote[]
+  invoices             Invoice[]
+  recurringTemplates   RecurringTemplate[]
+
+  @@map("clients")
+}
+
+// ─── PROVIDERS ──────────────────────────────────────────────
+
+model Provider {
+  id                    String   @id @default(uuid()) @db.Uuid
+  companyId             String   @map("company_id") @db.Uuid
+  name                  String
+  taxId                 String?  @map("tax_id")
+  email                 String?
+  phone                 String?
+  addressLine1          String?  @map("address_line1")
+  addressLine2          String?  @map("address_line2")
+  city                  String?
+  postalCode            String?  @map("postal_code")
+  province              String?
+  country               String?
+  paymentTermsDays      Int      @default(30) @map("payment_terms_days")
+  defaultPaymentMethod  PaymentMethod @default(TRANSFER) @map("default_payment_method")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  company              Company  @relation(fields: [companyId], references: [id])
+  purchaseInvoices     PurchaseInvoice[]
+
+  @@map("providers")
+}
+
+// ─── SERVICES ───────────────────────────────────────────────
+
+model Service {
+  id             String   @id @default(uuid()) @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  name           String
+  description    String?
+  unitPriceCents Int      @map("unit_price_cents")
+  currency       String   @default("EUR")
+  defaultTaxId   String?  @map("default_tax_id") @db.Uuid
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company        Company  @relation(fields: [companyId], references: [id])
+  defaultTax     Tax?     @relation(fields: [defaultTaxId], references: [id])
+
+  @@map("services")
+}
+
+// ─── TAXES ──────────────────────────────────────────────────
+
+model Tax {
+  id                  String   @id @default(uuid()) @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  name                String               // e.g. "IVA 21%"
+  type                TaxType              // IVA, IRPF, etc.
+  rate                Decimal  @db.Decimal(5, 2) // e.g. 21.00, -15.00
+  isDefaultSales      Boolean  @default(false) @map("is_default_sales")
+  isDefaultPurchases  Boolean  @default(false) @map("is_default_purchases")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  company             Company  @relation(fields: [companyId], references: [id])
+  services            Service[]
+  quoteLines          QuoteLine[]
+  invoiceLines        InvoiceLine[]
+  purchaseInvoiceLines PurchaseInvoiceLine[]
+  recurringTemplateLines RecurringTemplateLine[]
+
+  @@map("taxes")
+}
+
+// ─── DOCUMENT COUNTERS ──────────────────────────────────────
+
+model DocumentCounter {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  year          Int
+  docType       DocType  @map("doc_type")
+  currentNumber Int      @default(0) @map("current_number")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, year, docType])
+  @@map("document_counters")
+}
+
+// ─── QUOTES ─────────────────────────────────────────────────
+
+model Quote {
+  id                 String      @id @default(uuid()) @db.Uuid
+  companyId          String      @map("company_id") @db.Uuid
+  clientId           String      @map("client_id") @db.Uuid
+  year               Int?
+  number             Int?                            // Assigned on emit
+  status             QuoteStatus @default(DRAFT)
+  issueDate          DateTime?   @map("issue_date")
+  validUntil         DateTime?   @map("valid_until")
+  currency           String      @default("EUR")
+  notes              String?                         // Internal notes
+  publicNotes        String?     @map("public_notes") // Visible on PDF
+  pdfUrl             String?     @map("pdf_url")
+  subtotalCents      Int         @default(0) @map("subtotal_cents")
+  taxCents           Int         @default(0) @map("tax_cents")
+  totalCents         Int         @default(0) @map("total_cents")
+  versionGroupId     String?     @map("version_group_id") @db.Uuid
+  versionNumber      Int         @default(1) @map("version_number")
+  convertedInvoiceId String?     @unique @map("converted_invoice_id") @db.Uuid
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  deletedAt          DateTime?   @map("deleted_at")
+
+  company            Company     @relation(fields: [companyId], references: [id])
+  client             Client      @relation(fields: [clientId], references: [id])
+  convertedInvoice   Invoice?    @relation("QuoteToInvoice", fields: [convertedInvoiceId], references: [id])
+  lines              QuoteLine[]
+
+  @@unique([companyId, year, number])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id                String   @id @default(uuid()) @db.Uuid
+  quoteId           String   @map("quote_id") @db.Uuid
+  position          Int
+  description       String
+  quantity          Decimal  @db.Decimal(10, 2)
+  unitPriceCents    Int      @map("unit_price_cents")
+  taxId             String?  @map("tax_id") @db.Uuid
+  lineSubtotalCents Int      @default(0) @map("line_subtotal_cents")
+  lineTaxCents      Int      @default(0) @map("line_tax_cents")
+  lineTotalCents    Int      @default(0) @map("line_total_cents")
+
+  quote             Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  tax               Tax?     @relation(fields: [taxId], references: [id])
+
+  @@map("quote_lines")
+}
+
+// ─── INVOICES ───────────────────────────────────────────────
+
+model Invoice {
+  id                   String          @id @default(uuid()) @db.Uuid
+  companyId            String          @map("company_id") @db.Uuid
+  clientId             String          @map("client_id") @db.Uuid
+  year                 Int?
+  number               Int?                                  // Assigned on emit
+  type                 InvoiceType     @default(INVOICE)
+  status               InvoiceStatus   @default(DRAFT)
+  issueDate            DateTime?       @map("issue_date")
+  dueDate              DateTime?       @map("due_date")
+  currency             String          @default("EUR")
+  notes                String?
+  publicNotes          String?         @map("public_notes")
+  pdfUrl               String?         @map("pdf_url")
+  subtotalCents        Int             @default(0) @map("subtotal_cents")
+  taxCents             Int             @default(0) @map("tax_cents")
+  totalCents           Int             @default(0) @map("total_cents")
+  paidCents            Int             @default(0) @map("paid_cents")
+  sourceQuoteId        String?         @map("source_quote_id") @db.Uuid
+  rectifiesInvoiceId   String?         @map("rectifies_invoice_id") @db.Uuid
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  deletedAt            DateTime?       @map("deleted_at")
+
+  company              Company         @relation(fields: [companyId], references: [id])
+  client               Client          @relation(fields: [clientId], references: [id])
+  rectifiesInvoice     Invoice?        @relation("CreditNoteToInvoice", fields: [rectifiesInvoiceId], references: [id])
+  creditNotes          Invoice[]       @relation("CreditNoteToInvoice")
+  sourceQuote          Quote?          @relation("QuoteToInvoice")
+  lines                InvoiceLine[]
+  payments             Payment[]       @relation("InvoicePayments")
+
+  @@unique([companyId, year, number, type])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id                String   @id @default(uuid()) @db.Uuid
+  invoiceId         String   @map("invoice_id") @db.Uuid
+  position          Int
+  description       String
+  quantity          Decimal  @db.Decimal(10, 2)
+  unitPriceCents    Int      @map("unit_price_cents")
+  taxId             String?  @map("tax_id") @db.Uuid
+  lineSubtotalCents Int      @default(0) @map("line_subtotal_cents")
+  lineTaxCents      Int      @default(0) @map("line_tax_cents")
+  lineTotalCents    Int      @default(0) @map("line_total_cents")
+
+  invoice           Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tax               Tax?     @relation(fields: [taxId], references: [id])
+
+  @@map("invoice_lines")
+}
+
+// ─── PURCHASE INVOICES ──────────────────────────────────────
+
+model PurchaseInvoice {
+  id                      String                @id @default(uuid()) @db.Uuid
+  companyId               String                @map("company_id") @db.Uuid
+  providerId              String                @map("provider_id") @db.Uuid
+  providerInvoiceNumber   String?               @map("provider_invoice_number")
+  year                    Int?
+  number                  Int?                  // Assigned on book/emit
+  status                  PurchaseInvoiceStatus @default(DRAFT)
+  issueDate               DateTime?             @map("issue_date")
+  dueDate                 DateTime?             @map("due_date")
+  currency                String                @default("EUR")
+  pdfUrl                  String?               @map("pdf_url")
+  subtotalCents           Int                   @default(0) @map("subtotal_cents")
+  taxCents                Int                   @default(0) @map("tax_cents")
+  totalCents              Int                   @default(0) @map("total_cents")
+  paidCents               Int                   @default(0) @map("paid_cents")
+  notes                   String?
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+  deletedAt               DateTime?             @map("deleted_at")
+
+  company                 Company               @relation(fields: [companyId], references: [id])
+  provider                Provider              @relation(fields: [providerId], references: [id])
+  lines                   PurchaseInvoiceLine[]
+  payments                Payment[]             @relation("PurchaseInvoicePayments")
+
+  @@unique([companyId, year, number])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceLine {
+  id                String          @id @default(uuid()) @db.Uuid
+  purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
+  position          Int
+  description       String
+  quantity          Decimal         @db.Decimal(10, 2)
+  unitPriceCents    Int             @map("unit_price_cents")
+  taxId             String?         @map("tax_id") @db.Uuid
+  lineSubtotalCents Int             @default(0) @map("line_subtotal_cents")
+  lineTaxCents      Int             @default(0) @map("line_tax_cents")
+  lineTotalCents    Int             @default(0) @map("line_total_cents")
+
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+  tax               Tax?            @relation(fields: [taxId], references: [id])
+
+  @@map("purchase_invoice_lines")
+}
+
+// ─── PAYMENTS ───────────────────────────────────────────────
+
+model Payment {
+  id                      String           @id @default(uuid()) @db.Uuid
+  companyId               String           @map("company_id") @db.Uuid
+  direction               PaymentDirection // IN = cobro, OUT = pago
+  method                  PaymentMethod    @default(TRANSFER)
+  date                    DateTime
+  amountCents             Int              @map("amount_cents")
+  currency                String           @default("EUR")
+  reference               String?          // Bank reference, notes
+  linkedInvoiceId         String?          @map("linked_invoice_id") @db.Uuid
+  linkedPurchaseInvoiceId String?          @map("linked_purchase_invoice_id") @db.Uuid
+  createdAt               DateTime         @default(now()) @map("created_at")
+  updatedAt               DateTime         @updatedAt @map("updated_at")
+
+  linkedInvoice           Invoice?         @relation("InvoicePayments", fields: [linkedInvoiceId], references: [id])
+  linkedPurchaseInvoice   PurchaseInvoice? @relation("PurchaseInvoicePayments", fields: [linkedPurchaseInvoiceId], references: [id])
+  company                 Company          @relation(fields: [companyId], references: [id])
+
+  @@map("payments")
+}
+
+// ─── RECURRING TEMPLATES ────────────────────────────────────
+
+model RecurringTemplate {
+  id          String                  @id @default(uuid()) @db.Uuid
+  companyId   String                  @map("company_id") @db.Uuid
+  clientId    String                  @map("client_id") @db.Uuid
+  name        String
+  startDate   DateTime                @map("start_date")
+  endDate     DateTime?               @map("end_date")
+  frequency   RecurringFrequency
+  dayOfMonth  Int?                    @map("day_of_month")
+  nextRunDate DateTime                @map("next_run_date")
+  status      RecurringTemplateStatus @default(ACTIVE)
+  currency    String                  @default("EUR")
+  notes       String?
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  company     Company                 @relation(fields: [companyId], references: [id])
+  client      Client                  @relation(fields: [clientId], references: [id])
+  lines       RecurringTemplateLine[]
+  runs        RecurringRun[]
+
+  @@map("recurring_templates")
+}
+
+model RecurringTemplateLine {
+  id                    String            @id @default(uuid()) @db.Uuid
+  recurringTemplateId   String            @map("recurring_template_id") @db.Uuid
+  position              Int
+  description           String
+  quantity              Decimal           @db.Decimal(10, 2)
+  unitPriceCents        Int               @map("unit_price_cents")
+  taxId                 String?           @map("tax_id") @db.Uuid
+
+  recurringTemplate     RecurringTemplate @relation(fields: [recurringTemplateId], references: [id], onDelete: Cascade)
+  tax                   Tax?              @relation(fields: [taxId], references: [id])
+
+  @@map("recurring_template_lines")
+}
+
+model RecurringRun {
+  id                    String              @id @default(uuid()) @db.Uuid
+  recurringTemplateId   String              @map("recurring_template_id") @db.Uuid
+  runDate               DateTime            @map("run_date")
+  status                RecurringRunStatus  @default(GENERATED)
+  generatedInvoiceId    String?             @map("generated_invoice_id") @db.Uuid
+  idempotencyKey        String              @unique @map("idempotency_key")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  recurringTemplate     RecurringTemplate   @relation(fields: [recurringTemplateId], references: [id])
+
+  @@map("recurring_runs")
+}
+
+// ─── ACTIVITY LOG ────────────────────────────────────────────
+
+model ActivityLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  companyId   String      @map("company_id") @db.Uuid
+  userId      String?     @map("user_id") @db.Uuid
+  entityType  String      @map("entity_type")    // "quote", "invoice", etc.
+  entityId    String      @map("entity_id") @db.Uuid
+  action      AuditAction
+  metadata    Json?       @db.JsonB
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  company     Company     @relation(fields: [companyId], references: [id])
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([companyId, createdAt])
+  @@map("activity_logs")
+}

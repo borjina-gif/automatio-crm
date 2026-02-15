@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: automatio-db
+    restart: always
+    environment:
+      POSTGRES_USER: automatio
+      POSTGRES_PASSWORD: automatio_dev_2026
+      POSTGRES_DB: automatio_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
