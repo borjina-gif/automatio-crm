@@ -1150,8 +1150,9 @@ textarea {
 }
 
 .login-logo-img {
-    height: 44px;
-    width: auto;
+    width: 100%;
+    max-width: 280px;
+    height: auto;
     object-fit: contain;
     filter: brightness(0) invert(1);
     opacity: 0.9;
