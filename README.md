@@ -167,3 +167,4 @@ SMTP_FROM="Automatio CRM <info@automatio.es>"
 ```json
 { "status": "ok", "db": true, "timestamp": "2026-02-14T15:40:00.000Z" }
 ```
+# automatio-crm
