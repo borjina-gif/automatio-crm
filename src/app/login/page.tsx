@@ -41,13 +41,7 @@ export default function LoginPage() {
             <div className="login-card">
                 {/* Logo */}
                 <div className="login-header">
-                    <div className="login-logo">
-                        <div className="login-logo-icon">A</div>
-                        <div>
-                            <div className="login-logo-text">Automatio</div>
-                            <div className="login-logo-sub">CRM · Gestión Empresarial</div>
-                        </div>
-                    </div>
+                    <img src="/logo.svg" alt="Automatio" className="login-logo-img" />
                 </div>
 
                 <h1 className="login-title">Iniciar sesión</h1>

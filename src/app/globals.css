@@ -1138,3 +1138,20 @@ textarea {
     background: rgba(239, 68, 68, 0.1);
     color: #f87171;
 }
+
+/* ===== Logo Images ===== */
+.sidebar-logo-img {
+    height: 28px;
+    width: auto;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+    opacity: 0.95;
+}
+
+.login-logo-img {
+    height: 44px;
+    width: auto;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
+}

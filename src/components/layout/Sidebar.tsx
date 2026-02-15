@@ -54,11 +54,7 @@ export default function Sidebar() {
         <aside className="sidebar">
             {/* Logo */}
             <div className="sidebar-logo">
-                <div className="sidebar-logo-icon">A</div>
-                <div>
-                    <div className="sidebar-logo-text">Automatio</div>
-                    <div className="sidebar-logo-sub">CRM · Gestión</div>
-                </div>
+                <img src="/logo.svg" alt="Automatio" className="sidebar-logo-img" />
             </div>
 
             {/* Navigation */}
