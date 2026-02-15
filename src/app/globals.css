@@ -461,7 +461,7 @@ textarea {
     background: var(--color-surface);
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .data-table {
@@ -1156,4 +1156,88 @@ textarea {
     object-fit: contain;
     filter: brightness(0) invert(1);
     opacity: 0.9;
+}
+
+/* ===== Actions Dropdown ===== */
+.actions-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.actions-dropdown-trigger {
+    font-size: 18px;
+    letter-spacing: 2px;
+    min-width: 36px;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+}
+
+.actions-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 100;
+    min-width: 200px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    padding: 6px 0;
+    backdrop-filter: blur(12px);
+    animation: dropdown-fade-in 0.15s ease-out;
+}
+
+@keyframes dropdown-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.actions-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 16px;
+    border: none;
+    background: none;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.actions-dropdown-item:hover {
+    background: var(--color-hover);
+    color: var(--color-text);
+}
+
+.actions-dropdown-danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+}
+
+.actions-dropdown-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 4px 0;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-text-muted);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
 }

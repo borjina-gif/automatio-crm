@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -31,6 +31,148 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
     PAID: { label: "Pagada", class: "badge-success" },
     VOID: { label: "Anulada", class: "badge-danger" },
 };
+
+// ── Actions Dropdown ──────────────────────────────────────
+
+function ActionsDropdown({ invoice, onRefresh }: { invoice: InvoiceItem; onRefresh: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState("");
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Close on click outside
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        if (open) document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [open]);
+
+    async function handleDownloadPDF() {
+        setLoading("pdf");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}/pdf`);
+            if (!res.ok) throw new Error("Error al generar PDF");
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download =
+                res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") ||
+                "factura.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleEmit() {
+        if (!confirm("¿Emitir factura? Se asignará número definitivo.")) return;
+        setLoading("emit");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}/emit`, { method: "POST" });
+            if (!res.ok) throw new Error((await res.json()).error);
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleSendEmail() {
+        if (!confirm("¿Enviar factura por email al cliente?")) return;
+        setLoading("send");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}/send`, { method: "POST" });
+            if (!res.ok) throw new Error((await res.json()).error);
+            alert("📧 Factura enviada");
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirm("¿Eliminar esta factura?")) return;
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error("Error al eliminar");
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setOpen(false);
+        }
+    }
+
+    const isDraft = invoice.status === "DRAFT";
+    const isIssued = invoice.status === "ISSUED";
+
+    return (
+        <div className="actions-dropdown" ref={ref}>
+            <button
+                className="btn btn-ghost btn-sm actions-dropdown-trigger"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(!open);
+                }}
+                disabled={!!loading}
+            >
+                {loading ? <span className="spinner-sm" /> : "⋯"}
+            </button>
+            {open && (
+                <div className="actions-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                    {/* Always: Ver detalle */}
+                    <Link href={`/invoices/${invoice.id}`} className="actions-dropdown-item">
+                        👁️ Ver detalle
+                    </Link>
+
+                    {/* Always: PDF */}
+                    <button className="actions-dropdown-item" onClick={handleDownloadPDF}>
+                        📄 Descargar PDF
+                    </button>
+
+                    <div className="actions-dropdown-divider" />
+
+                    {/* DRAFT */}
+                    {isDraft && (
+                        <>
+                            <button className="actions-dropdown-item" onClick={handleEmit}>
+                                📋 Emitir
+                            </button>
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item actions-dropdown-danger" onClick={handleDelete}>
+                                🗑️ Eliminar
+                            </button>
+                        </>
+                    )}
+
+                    {/* ISSUED */}
+                    {isIssued && (
+                        <button className="actions-dropdown-item" onClick={handleSendEmail}>
+                            📧 Enviar email
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Main Page ─────────────────────────────────────────────
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
@@ -104,7 +246,7 @@ export default function InvoicesPage() {
                                 <th>Total</th>
                                 <th>Pagado</th>
                                 <th>Fecha</th>
-                                <th></th>
+                                <th style={{ width: 50 }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -137,14 +279,8 @@ export default function InvoicesPage() {
                                                 ? new Date(inv.issueDate).toLocaleDateString("es-ES")
                                                 : new Date(inv.createdAt).toLocaleDateString("es-ES")}
                                         </td>
-                                        <td className="text-right">
-                                            <Link
-                                                href={`/invoices/${inv.id}`}
-                                                className="btn btn-ghost btn-sm"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                Ver →
-                                            </Link>
+                                        <td className="text-right" style={{ position: "relative" }}>
+                                            <ActionsDropdown invoice={inv} onRefresh={fetchInvoices} />
                                         </td>
                                     </tr>
                                 );

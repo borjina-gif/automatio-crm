@@ -149,6 +149,9 @@ export default function InvoiceDetailPage() {
                             <button onClick={handleEmit} className="btn btn-primary" disabled={!!actionLoading}>
                                 {actionLoading === "emit" ? "Emitiendo..." : "📋 Emitir"}
                             </button>
+                            <button onClick={handleDownloadPDF} className="btn btn-secondary" disabled={!!actionLoading}>
+                                {actionLoading === "pdf" ? "Generando..." : "📄 PDF"}
+                            </button>
                             <button onClick={handleDelete} className="btn btn-danger btn-sm">🗑️</button>
                         </>
                     )}

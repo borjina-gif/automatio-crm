@@ -1,9 +1,11 @@
 // ============================================================
 // Automatio CRM — PDF Generation
 // jsPDF-based document generator for quotes and invoices
+// Style: Clean white background, branded header with logo
 // ============================================================
 
 import { jsPDF } from "jspdf";
+import { LOGO_BASE64 } from "./logo-base64";
 
 // ─── TYPES ──────────────────────────────────────────────────
 
@@ -44,7 +46,7 @@ interface ClientInfo {
 
 interface DocumentData {
     docType: "quote" | "invoice";
-    docNumber: string; // e.g. "PRE-2026-0001"
+    docNumber: string;
     status: string;
     issueDate?: Date | string | null;
     validUntil?: Date | string | null;
@@ -56,7 +58,7 @@ interface DocumentData {
     company: CompanyInfo;
     client: ClientInfo;
     publicNotes?: string | null;
-    invoiceType?: string; // "INVOICE" | "CREDIT_NOTE"
+    invoiceType?: string;
 }
 
 // ─── HELPERS ────────────────────────────────────────────────
@@ -78,17 +80,13 @@ function fmtDate(d: Date | string | null | undefined): string {
     });
 }
 
-// ─── LEGAL FOOTER ───────────────────────────────────────────
+// ─── COLORS ─────────────────────────────────────────────────
 
-const LEGAL_FOOTER = [
-    "1. Este documento se emite conforme a los datos facilitados por el cliente. Revíselo y comunique cualquier error a la mayor brevedad.",
-    "2. Salvo pacto por escrito, la forma de pago es transferencia bancaria a ES4120854503000330904034.",
-    "3. Los importes e impuestos aplicados se calculan según la información y configuración fiscal disponible en el momento de emisión.",
-    "4. Presupuestos: validez indicada en el propio documento. La aceptación implica conformidad con el alcance y precios descritos.",
-    "5. Facturas: el impago en plazo podrá dar lugar a reclamación de cantidades conforme a la normativa aplicable.",
-    "6. Protección de datos: los datos se tratan para la gestión administrativa y contractual. Puede ejercer sus derechos contactando en info@automatio.es.",
-    "7. En caso de controversia, las partes se someten a la jurisdicción que corresponda legalmente.",
-];
+const BRAND_NAVY: [number, number, number] = [27, 22, 96];   // #1b1660
+const TEXT_DARK: [number, number, number] = [40, 40, 50];
+const TEXT_MEDIUM: [number, number, number] = [100, 100, 115];
+const TEXT_LIGHT: [number, number, number] = [140, 140, 155];
+const LINE_COLOR: [number, number, number] = [210, 210, 220];
 
 const IBAN = "ES4120854503000330904034";
 
@@ -97,250 +95,371 @@ const IBAN = "ES4120854503000330904034";
 export function generateDocumentPDF(data: DocumentData): Buffer {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const pageWidth = 210;
-    const margin = 20;
-    const contentWidth = pageWidth - margin * 2;
+    const pageHeight = 297;
+    const marginLeft = 20;
+    const marginRight = 20;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    const rightEdge = pageWidth - marginRight;
     let y = 20;
+    let pageNumber = 1;
 
-    // ── HEADER BAR ──────────────────────────────────────
-    doc.setFillColor(30, 30, 50);
-    doc.rect(0, 0, pageWidth, 40, "F");
+    // ── HELPER: draw footer on current page ─────────────
+    function drawPageFooter() {
+        const footerY = pageHeight - 12;
+        doc.setDrawColor(...LINE_COLOR);
+        doc.line(marginLeft, footerY - 4, rightEdge, footerY - 4);
 
-    // Company name
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(data.company.tradeName || data.company.legalName, margin, 18);
+        doc.setFontSize(7);
+        doc.setTextColor(...TEXT_LIGHT);
+        doc.setFont("helvetica", "normal");
 
-    // Document type title
+        // Left: doc number + total + due date
+        const footerParts: string[] = [data.docNumber];
+        if (data.totalCents) footerParts.push(`${fmtCents(data.totalCents)}€`);
+        if (data.dueDate) footerParts.push(`Vencimiento ${fmtDate(data.dueDate)}`);
+        if (data.validUntil) footerParts.push(`Válido hasta ${fmtDate(data.validUntil)}`);
+        doc.text(footerParts.join(" - "), marginLeft, footerY);
+
+        // Right: page number
+        doc.text(`Pág. ${pageNumber} de {PAGES}`, rightEdge, footerY, { align: "right" });
+    }
+
+    // ── HELPER: check page break ────────────────────────
+    function checkPageBreak(neededSpace: number) {
+        if (y + neededSpace > pageHeight - 20) {
+            drawPageFooter();
+            doc.addPage();
+            pageNumber++;
+            y = 20;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // 1. HEADER: Title + Logo
+    // ══════════════════════════════════════════════════════
+
+    // Document type title (left)
     const docTitle =
         data.docType === "quote"
-            ? "PRESUPUESTO"
+            ? "Presupuesto"
             : data.invoiceType === "CREDIT_NOTE"
-                ? "FACTURA RECTIFICATIVA"
-                : "FACTURA";
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(docTitle, margin, 28);
+                ? "Factura Rectificativa"
+                : "Factura";
 
-    // Document number (right)
-    doc.setFontSize(14);
+    doc.setTextColor(...TEXT_DARK);
+    doc.setFontSize(26);
     doc.setFont("helvetica", "bold");
-    doc.text(data.docNumber, pageWidth - margin, 18, { align: "right" });
+    doc.text(docTitle, marginLeft, y + 8);
 
-    // Date (right)
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(fmtDate(data.issueDate), pageWidth - margin, 28, { align: "right" });
+    // Logo (top-right corner)
+    try {
+        const logoW = 35;
+        const logoH = 35;
+        doc.addImage(LOGO_BASE64, "PNG", rightEdge - logoW, y - 5, logoW, logoH);
+    } catch {
+        // If logo fails, skip silently
+    }
 
-    y = 50;
+    y += 18;
 
-    // ── COMPANY & CLIENT BLOCKS ─────────────────────────
-    doc.setTextColor(80, 80, 100);
-    doc.setFontSize(8);
+    // ══════════════════════════════════════════════════════
+    // 2. DOCUMENT METADATA (Number, Date, Due Date)
+    // ══════════════════════════════════════════════════════
+
+    doc.setFontSize(9);
+    const metaLabelX = marginLeft + 2;
+    const metaValueX = marginLeft + 32;
+
+    // Number
     doc.setFont("helvetica", "bold");
-    doc.text("EMISOR", margin, y);
-    doc.text("CLIENTE", margin + contentWidth / 2 + 5, y);
+    doc.setTextColor(...TEXT_MEDIUM);
+    doc.text("Número #", metaLabelX, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(data.docNumber, metaValueX, y);
     y += 5;
 
+    // Issue date
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_MEDIUM);
+    doc.text("Fecha", metaLabelX, y);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(40, 40, 60);
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(fmtDate(data.issueDate), metaValueX, y);
+    y += 5;
 
-    // Company info (left column)
-    const companyLines = [
-        data.company.legalName,
-        data.company.taxId ? `CIF: ${data.company.taxId}` : null,
+    // Due date / Valid until
+    if (data.dueDate) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...TEXT_MEDIUM);
+        doc.text("Vencimiento", metaLabelX, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...TEXT_DARK);
+        doc.text(fmtDate(data.dueDate), metaValueX, y);
+        y += 5;
+    } else if (data.validUntil) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...TEXT_MEDIUM);
+        doc.text("Válido hasta", metaLabelX, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...TEXT_DARK);
+        doc.text(fmtDate(data.validUntil), metaValueX, y);
+        y += 5;
+    }
+
+    y += 8;
+
+    // ══════════════════════════════════════════════════════
+    // 3. COMPANY / SHIPPING / CLIENT — 3 Columns
+    // ══════════════════════════════════════════════════════
+
+    const col1X = marginLeft;
+    const col2X = marginLeft + contentWidth * 0.38;
+    const col3X = marginLeft + contentWidth * 0.68;
+
+    const blockStartY = y;
+
+    // ── Column 1: Emisor (Company) ──
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(data.company.legalName, col1X, y);
+    y += 4.5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...TEXT_MEDIUM);
+
+    const companyDetails = [
+        data.company.tradeName && data.company.tradeName !== data.company.legalName
+            ? data.company.tradeName
+            : null,
         data.company.addressLine1,
-        [data.company.postalCode, data.company.city, data.company.province]
+        [data.company.postalCode ? `${data.company.postalCode} (${data.company.city})` : data.company.city, data.company.province, data.company.country === "ES" ? "España" : data.company.country]
             .filter(Boolean)
             .join(", ") || null,
-        data.company.email,
+        data.company.taxId,
         data.company.phone,
+        data.company.email,
     ].filter(Boolean) as string[];
 
-    companyLines.forEach((line) => {
-        doc.text(line, margin, y);
-        y += 4.5;
+    companyDetails.forEach((line) => {
+        doc.text(line, col1X, y);
+        y += 4;
     });
 
-    // Client info (right column)
-    let yRight = 55;
-    const clientLines = [
-        data.client.name,
-        data.client.taxId ? `NIF: ${data.client.taxId}` : null,
+    // ── Column 2: Dirección de envío ──
+    let yCol2 = blockStartY;
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_MEDIUM);
+    doc.text("Dirección de envío", col2X, yCol2);
+    yCol2 += 4.5;
+
+    doc.setFont("helvetica", "normal");
+    const shippingAddress = [
         data.client.billingAddressLine1,
         [data.client.billingPostalCode, data.client.billingCity, data.client.billingProvince]
             .filter(Boolean)
             .join(", ") || null,
-        data.client.email,
+        "España",
     ].filter(Boolean) as string[];
 
-    clientLines.forEach((line) => {
-        doc.text(line, margin + contentWidth / 2 + 5, yRight);
-        yRight += 4.5;
+    shippingAddress.forEach((line) => {
+        doc.text(line, col2X, yCol2);
+        yCol2 += 4;
     });
 
-    y = Math.max(y, yRight) + 5;
-
-    // ── DATES ROW ───────────────────────────────────────
-    doc.setFillColor(245, 245, 250);
-    doc.rect(margin, y, contentWidth, 8, "F");
-    doc.setFontSize(8);
-    doc.setTextColor(80, 80, 100);
-
-    const dateParts: string[] = [];
-    if (data.issueDate) dateParts.push(`Fecha: ${fmtDate(data.issueDate)}`);
-    if (data.validUntil) dateParts.push(`Válido hasta: ${fmtDate(data.validUntil)}`);
-    if (data.dueDate) dateParts.push(`Vencimiento: ${fmtDate(data.dueDate)}`);
-
-    doc.text(dateParts.join("   |   "), margin + 3, y + 5.5);
-    y += 14;
-
-    // ── LINES TABLE ─────────────────────────────────────
-    // Header
-    doc.setFillColor(30, 30, 50);
-    doc.rect(margin, y, contentWidth, 8, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
+    // ── Column 3: Cliente ──
+    let yCol3 = blockStartY;
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_MEDIUM);
+    doc.text("Cliente", col3X, yCol3);
+    yCol3 += 4.5;
 
-    const cols = [
-        { label: "#", x: margin + 2, w: 8 },
-        { label: "Descripción", x: margin + 12, w: 65 },
-        { label: "Cant.", x: margin + 80, w: 15 },
-        { label: "Precio", x: margin + 97, w: 22 },
-        { label: "Impuesto", x: margin + 121, w: 22 },
-        { label: "Subtotal", x: margin + 145, w: 25 },
-    ];
-
-    cols.forEach((col) => doc.text(col.label, col.x, y + 5.5));
-    y += 10;
-
-    // Data rows
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(40, 40, 60);
+    const clientDetails = [
+        data.client.name,
+        data.client.billingAddressLine1,
+        [data.client.billingPostalCode, data.client.billingCity, data.client.billingProvince]
+            .filter(Boolean)
+            .join(", ") || null,
+        "España",
+        data.client.taxId,
+    ].filter(Boolean) as string[];
 
-    data.lines.forEach((line, idx) => {
-        // Check page break
-        if (y > 250) {
-            doc.addPage();
-            y = 20;
-        }
-
-        // Alternate row bg
-        if (idx % 2 === 0) {
-            doc.setFillColor(250, 250, 252);
-            doc.rect(margin, y - 3, contentWidth, 8, "F");
-        }
-
-        doc.setFontSize(8);
-        doc.text(String(line.position), cols[0].x, y + 2);
-
-        // Truncate description if too long
-        const desc =
-            line.description.length > 40
-                ? line.description.substring(0, 38) + "…"
-                : line.description;
-        doc.text(desc, cols[1].x, y + 2);
-        doc.text(String(Number(line.quantity)), cols[2].x, y + 2);
-        doc.text(`${fmtCents(line.unitPriceCents)} €`, cols[3].x, y + 2);
-        doc.text(line.tax?.name || "—", cols[4].x, y + 2);
-        doc.text(`${fmtCents(line.lineTotalCents)} €`, cols[5].x, y + 2);
-
-        y += 7;
+    clientDetails.forEach((line) => {
+        doc.text(line, col3X, yCol3);
+        yCol3 += 4;
     });
 
-    y += 5;
+    y = Math.max(y, yCol2, yCol3) + 8;
 
-    // ── TOTALS ──────────────────────────────────────────
-    const totalsX = margin + contentWidth - 60;
-
-    doc.setDrawColor(220, 220, 230);
-    doc.line(totalsX, y, margin + contentWidth, y);
+    // ── Separator line ──
+    doc.setDrawColor(...LINE_COLOR);
+    doc.line(marginLeft, y, rightEdge, y);
     y += 6;
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Subtotal:", totalsX, y);
-    doc.text(`${fmtCents(data.subtotalCents)} €`, margin + contentWidth, y, {
-        align: "right",
-    });
-    y += 5;
+    // ══════════════════════════════════════════════════════
+    // 4. TABLE HEADER
+    // ══════════════════════════════════════════════════════
 
-    doc.text("Impuestos:", totalsX, y);
-    doc.text(`${fmtCents(data.taxCents)} €`, margin + contentWidth, y, {
-        align: "right",
-    });
+    const colConcepto = marginLeft;
+    const colPrecio = marginLeft + 85;
+    const colUnidades = marginLeft + 107;
+    const colSubtotal = marginLeft + 127;
+    const colIva = marginLeft + 147;
+    const colTotal = marginLeft + 160;
+
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...TEXT_LIGHT);
+
+    doc.text("CONCEPTO", colConcepto, y);
+    doc.text("PRECIO", colPrecio, y, { align: "right" });
+    doc.text("UNIDADES", colUnidades, y, { align: "right" });
+    doc.text("SUBTOTAL", colSubtotal, y, { align: "right" });
+    doc.text("IVA", colIva, y, { align: "right" });
+    doc.text("TOTAL", rightEdge, y, { align: "right" });
+
+    y += 3;
+    doc.setDrawColor(...LINE_COLOR);
+    doc.line(marginLeft, y, rightEdge, y);
     y += 6;
 
-    doc.setFillColor(30, 30, 50);
-    doc.rect(totalsX - 2, y - 4, contentWidth - totalsX + 4, 9, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTAL:", totalsX, y + 2);
-    doc.text(`${fmtCents(data.totalCents)} €`, margin + contentWidth, y + 2, {
-        align: "right",
-    });
+    // ══════════════════════════════════════════════════════
+    // 5. TABLE ROWS
+    // ══════════════════════════════════════════════════════
 
-    y += 14;
-    doc.setTextColor(40, 40, 60);
-
-    // ── IBAN ────────────────────────────────────────────
-    doc.setFillColor(240, 245, 255);
-    doc.rect(margin, y, contentWidth, 10, "F");
     doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("Forma de pago: Transferencia bancaria", margin + 3, y + 4);
-    doc.setFont("helvetica", "normal");
-    doc.text(`IBAN: ${IBAN}`, margin + 3, y + 8.5);
-    y += 16;
 
-    // ── PUBLIC NOTES ────────────────────────────────────
-    if (data.publicNotes) {
-        if (y > 240) {
-            doc.addPage();
-            y = 20;
-        }
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(80, 80, 100);
-        doc.text("Observaciones:", margin, y);
-        y += 4;
+    data.lines.forEach((line) => {
+        checkPageBreak(10);
+
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(60, 60, 80);
+        doc.setTextColor(...TEXT_DARK);
+
+        // Description — wrap if too long
+        const descMaxW = 78;
+        const descLines = doc.splitTextToSize(line.description, descMaxW);
+        doc.text(descLines, colConcepto, y);
+
+        // Numeric columns
+        doc.text(`${fmtCents(line.unitPriceCents)}€`, colPrecio, y, { align: "right" });
+        doc.text(String(Number(line.quantity)), colUnidades, y, { align: "right" });
+        doc.text(`${fmtCents(line.lineSubtotalCents)}€`, colSubtotal, y, { align: "right" });
+        doc.text(line.tax ? `${line.tax.rate}%` : "—", colIva, y, { align: "right" });
+        doc.text(`${fmtCents(line.lineTotalCents)}€`, rightEdge, y, { align: "right" });
+
+        y += Math.max(descLines.length * 4.5, 7);
+    });
+
+    y += 2;
+    doc.setDrawColor(...LINE_COLOR);
+    doc.line(marginLeft + contentWidth * 0.5, y, rightEdge, y);
+    y += 8;
+
+    // ══════════════════════════════════════════════════════
+    // 6. TOTALS BLOCK (right-aligned)
+    // ══════════════════════════════════════════════════════
+
+    checkPageBreak(35);
+
+    const totalsLabelX = marginLeft + contentWidth * 0.5;
+
+    // Base Imponible
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_DARK);
+    doc.text("BASE IMPONIBLE", totalsLabelX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${fmtCents(data.subtotalCents)}€`, rightEdge, y, { align: "right" });
+    y += 7;
+
+    // IVA — detect rate from lines
+    const taxRate = data.lines.find((l) => l.tax?.rate)?.tax?.rate;
+    const ivaLabel = taxRate ? `IVA ${taxRate}%` : "IVA";
+    doc.setFont("helvetica", "bold");
+    doc.text(ivaLabel, totalsLabelX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${fmtCents(data.taxCents)}€`, rightEdge, y, { align: "right" });
+    y += 7;
+
+    // TOTAL
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("TOTAL", totalsLabelX, y);
+    doc.text(`${fmtCents(data.totalCents)}€`, rightEdge, y, { align: "right" });
+
+    y += 14;
+
+    // ══════════════════════════════════════════════════════
+    // 7. PAYMENT CONDITIONS
+    // ══════════════════════════════════════════════════════
+
+    checkPageBreak(25);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...TEXT_DARK);
+    doc.text("Condiciones de pago", marginLeft, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...TEXT_MEDIUM);
+    doc.text(
+        `Pagar por transferencia bancaria al siguiente número de cuenta: ${IBAN}`,
+        marginLeft,
+        y
+    );
+    y += 8;
+
+    // ══════════════════════════════════════════════════════
+    // 8. PUBLIC NOTES (optional)
+    // ══════════════════════════════════════════════════════
+
+    if (data.publicNotes) {
+        checkPageBreak(20);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...TEXT_MEDIUM);
+        doc.text("Observaciones:", marginLeft, y);
+        y += 4.5;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...TEXT_DARK);
         const noteLines = doc.splitTextToSize(data.publicNotes, contentWidth);
-        doc.text(noteLines, margin, y);
+        doc.text(noteLines, marginLeft, y);
         y += noteLines.length * 3.5 + 4;
     }
 
-    // ── LEGAL FOOTER ────────────────────────────────────
-    // Always on last portion of page or new page
-    if (y > 230) {
-        doc.addPage();
-        y = 20;
+    // ══════════════════════════════════════════════════════
+    // 9. DRAW FOOTER ON ALL PAGES
+    // ══════════════════════════════════════════════════════
+
+    const totalPages = doc.getNumberOfPages();
+
+    for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        const footerY = pageHeight - 12;
+
+        doc.setDrawColor(...LINE_COLOR);
+        doc.line(marginLeft, footerY - 4, rightEdge, footerY - 4);
+
+        doc.setFontSize(7);
+        doc.setTextColor(...TEXT_LIGHT);
+        doc.setFont("helvetica", "normal");
+
+        // Left: doc info
+        const footerParts: string[] = [data.docNumber];
+        if (data.totalCents) footerParts.push(`${fmtCents(data.totalCents)}€`);
+        if (data.dueDate) footerParts.push(`Vencimiento ${fmtDate(data.dueDate)}`);
+        if (data.validUntil) footerParts.push(`Válido hasta ${fmtDate(data.validUntil)}`);
+        doc.text(footerParts.join(" - "), marginLeft, footerY);
+
+        // Right: page X of Y
+        doc.text(`Pág. ${p} de ${totalPages}`, rightEdge, footerY, { align: "right" });
     }
-
-    doc.setDrawColor(200, 200, 210);
-    doc.line(margin, y, margin + contentWidth, y);
-    y += 5;
-
-    doc.setFontSize(6);
-    doc.setTextColor(130, 130, 150);
-    doc.setFont("helvetica", "normal");
-
-    LEGAL_FOOTER.forEach((clause) => {
-        const wrapped = doc.splitTextToSize(clause, contentWidth);
-        doc.text(wrapped, margin, y);
-        y += wrapped.length * 2.5 + 1;
-    });
-
-    // Company name at bottom
-    y += 2;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(80, 80, 100);
-    doc.text(data.company.legalName, pageWidth / 2, y, { align: "center" });
 
     // Convert to Buffer
     const arrayBuffer = doc.output("arraybuffer");

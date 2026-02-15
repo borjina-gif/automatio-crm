@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -28,6 +28,202 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
     REJECTED: { label: "Rechazado", class: "badge-danger" },
     EXPIRED: { label: "Expirado", class: "badge-warning" },
 };
+
+// ── Actions Dropdown ──────────────────────────────────────
+
+function ActionsDropdown({ quote, onRefresh }: { quote: QuoteItem; onRefresh: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState("");
+    const ref = useRef<HTMLDivElement>(null);
+    const router = useRouter();
+
+    // Close on click outside
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        if (open) document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [open]);
+
+    async function handleDownloadPDF() {
+        setLoading("pdf");
+        try {
+            const res = await fetch(`/api/quotes/${quote.id}/pdf`);
+            if (!res.ok) throw new Error("Error al generar PDF");
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download =
+                res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") ||
+                "presupuesto.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleEmit() {
+        if (!confirm("¿Emitir presupuesto? Se asignará número definitivo.")) return;
+        setLoading("emit");
+        try {
+            const res = await fetch(`/api/quotes/${quote.id}/emit`, { method: "POST" });
+            if (!res.ok) throw new Error((await res.json()).error);
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleSendEmail() {
+        if (!confirm("¿Enviar presupuesto por email al cliente?")) return;
+        setLoading("send");
+        try {
+            const res = await fetch(`/api/quotes/${quote.id}/send`, { method: "POST" });
+            if (!res.ok) throw new Error((await res.json()).error);
+            alert("📧 Presupuesto enviado");
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleStatusChange(newStatus: string) {
+        try {
+            const res = await fetch(`/api/quotes/${quote.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!res.ok) throw new Error("Error al cambiar estado");
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setOpen(false);
+        }
+    }
+
+    async function handleConvert() {
+        if (!confirm("¿Convertir a factura? Se creará una factura borrador.")) return;
+        setLoading("convert");
+        try {
+            const res = await fetch(`/api/quotes/${quote.id}/convert`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            router.push(`/invoices/${data.id}`);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading("");
+            setOpen(false);
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirm("¿Eliminar este presupuesto?")) return;
+        try {
+            await fetch(`/api/quotes/${quote.id}`, { method: "DELETE" });
+            onRefresh();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setOpen(false);
+        }
+    }
+
+    const isDraft = quote.status === "DRAFT";
+    const isSent = quote.status === "SENT";
+    const isAccepted = quote.status === "ACCEPTED";
+
+    return (
+        <div className="actions-dropdown" ref={ref}>
+            <button
+                className="btn btn-ghost btn-sm actions-dropdown-trigger"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(!open);
+                }}
+                disabled={!!loading}
+            >
+                {loading ? <span className="spinner-sm" /> : "⋯"}
+            </button>
+            {open && (
+                <div className="actions-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                    {/* Always: Ver detalle */}
+                    <Link href={`/quotes/${quote.id}`} className="actions-dropdown-item">
+                        👁️ Ver detalle
+                    </Link>
+
+                    {/* Always: PDF */}
+                    <button className="actions-dropdown-item" onClick={handleDownloadPDF}>
+                        📄 Descargar PDF
+                    </button>
+
+                    <div className="actions-dropdown-divider" />
+
+                    {/* DRAFT */}
+                    {isDraft && (
+                        <>
+                            <button className="actions-dropdown-item" onClick={handleEmit}>
+                                📋 Emitir
+                            </button>
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item actions-dropdown-danger" onClick={handleDelete}>
+                                🗑️ Eliminar
+                            </button>
+                        </>
+                    )}
+
+                    {/* SENT */}
+                    {isSent && (
+                        <>
+                            <button className="actions-dropdown-item" onClick={handleSendEmail}>
+                                📧 Enviar email
+                            </button>
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item" onClick={() => handleStatusChange("ACCEPTED")}>
+                                ✅ Aceptar
+                            </button>
+                            <button className="actions-dropdown-item" onClick={() => handleStatusChange("REJECTED")}>
+                                ❌ Rechazar
+                            </button>
+                        </>
+                    )}
+
+                    {/* ACCEPTED */}
+                    {isAccepted && (
+                        <>
+                            <button className="actions-dropdown-item" onClick={handleSendEmail}>
+                                📧 Enviar email
+                            </button>
+                            <button className="actions-dropdown-item" onClick={handleConvert}>
+                                🔄 Convertir a factura
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Main Page ─────────────────────────────────────────────
 
 export default function QuotesPage() {
     const [quotes, setQuotes] = useState<QuoteItem[]>([]);
@@ -105,7 +301,7 @@ export default function QuotesPage() {
                                 <th>Estado</th>
                                 <th>Total</th>
                                 <th>Fecha</th>
-                                <th></th>
+                                <th style={{ width: 50 }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -126,14 +322,8 @@ export default function QuotesPage() {
                                         </td>
                                         <td className="cell-amount">{formatCents(q.totalCents)}</td>
                                         <td>{new Date(q.createdAt).toLocaleDateString("es-ES")}</td>
-                                        <td className="text-right">
-                                            <Link
-                                                href={`/quotes/${q.id}`}
-                                                className="btn btn-ghost btn-sm"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                Editar →
-                                            </Link>
+                                        <td className="text-right" style={{ position: "relative" }}>
+                                            <ActionsDropdown quote={q} onRefresh={fetchQuotes} />
                                         </td>
                                     </tr>
                                 );
