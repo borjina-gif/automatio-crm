@@ -110,6 +110,7 @@ model User {
   passwordHash  String   @map("password_hash")
   name          String   @default("")
   role          UserRole @default(ADMIN)
+  isActive      Boolean  @default(true) @map("is_active")
   lastLoginAt   DateTime? @map("last_login_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -151,6 +152,7 @@ model Company {
   recurringTemplates RecurringTemplate[]
   activityLogs       ActivityLog[]
   bankAccounts       BankAccount[]
+  branding           Branding?
 
   @@map("company")
 }
@@ -573,4 +575,22 @@ model BankTransaction {
 
   @@index([accountId, date])
   @@map("bank_transactions")
+}
+
+// ─── BRANDING ───────────────────────────────────────────────
+
+model Branding {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyId       String   @unique @map("company_id") @db.Uuid
+  logoBase64      String?  @map("logo_base64")
+  darkLogoBase64  String?  @map("dark_logo_base64")
+  appName         String?  @map("app_name")
+  primaryColor    String   @default("#1B1660") @map("primary_color")
+  footerText      String?  @map("footer_text")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  company         Company  @relation(fields: [companyId], references: [id])
+
+  @@map("branding")
 }
