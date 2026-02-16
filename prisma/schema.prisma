@@ -150,6 +150,7 @@ model Company {
   payments           Payment[]
   recurringTemplates RecurringTemplate[]
   activityLogs       ActivityLog[]
+  bankAccounts       BankAccount[]
 
   @@map("company")
 }
@@ -358,6 +359,7 @@ model Invoice {
   sourceQuote          Quote?          @relation("QuoteToInvoice")
   lines                InvoiceLine[]
   payments             Payment[]       @relation("InvoicePayments")
+  bankTransactions     BankTransaction[] @relation("InvoiceBankTransactions")
 
   @@unique([companyId, year, number, type])
   @@map("invoices")
@@ -408,6 +410,7 @@ model PurchaseInvoice {
   provider                Provider              @relation(fields: [providerId], references: [id])
   lines                   PurchaseInvoiceLine[]
   payments                Payment[]             @relation("PurchaseInvoicePayments")
+  bankTransactions        BankTransaction[]     @relation("PurchaseInvoiceBankTransactions")
 
   @@unique([companyId, year, number])
   @@map("purchase_invoices")
@@ -528,4 +531,46 @@ model ActivityLog {
   @@index([entityType, entityId])
   @@index([companyId, createdAt])
   @@map("activity_logs")
+}
+
+// ─── BANK ACCOUNTS ──────────────────────────────────────────
+
+model BankAccount {
+  id                  String   @id @default(uuid()) @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  name                String
+  iban                String?
+  currency            String   @default("EUR")
+  openingBalanceCents Int      @default(0) @map("opening_balance_cents")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  company             Company  @relation(fields: [companyId], references: [id])
+  transactions        BankTransaction[]
+
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id                        String           @id @default(uuid()) @db.Uuid
+  accountId                 String           @map("account_id") @db.Uuid
+  date                      DateTime
+  description               String
+  amountCents               Int              @map("amount_cents")  // positive = income, negative = expense
+  counterpartyName          String?          @map("counterparty_name")
+  category                  String?          // user-defined category
+  isReconciled              Boolean          @default(false) @map("is_reconciled")
+  linkedInvoiceId           String?          @map("linked_invoice_id") @db.Uuid
+  linkedPurchaseInvoiceId   String?          @map("linked_purchase_invoice_id") @db.Uuid
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  updatedAt                 DateTime         @updatedAt @map("updated_at")
+  deletedAt                 DateTime?        @map("deleted_at")
+
+  account                   BankAccount      @relation(fields: [accountId], references: [id])
+  linkedInvoice             Invoice?         @relation("InvoiceBankTransactions", fields: [linkedInvoiceId], references: [id])
+  linkedPurchaseInvoice     PurchaseInvoice? @relation("PurchaseInvoiceBankTransactions", fields: [linkedPurchaseInvoiceId], references: [id])
+
+  @@index([accountId, date])
+  @@map("bank_transactions")
 }

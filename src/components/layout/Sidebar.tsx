@@ -29,7 +29,9 @@ const NAV_ITEMS = [
     {
         section: "Finanzas",
         items: [
-            { label: "Tesorería", href: "/treasury", icon: "💰" },
+            { label: "Resumen", href: "/treasury", icon: "💰" },
+            { label: "Movimientos", href: "/treasury/movements", icon: "📋" },
+            { label: "Informes", href: "/treasury/reports", icon: "📊" },
         ],
     },
     {
