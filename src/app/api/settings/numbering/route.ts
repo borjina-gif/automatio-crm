@@ -30,13 +30,24 @@ export async function GET() {
             const currentNumber = counter?.currentNumber || 0;
             const nextNumber = currentNumber + 1;
             const prefix = prefixes[dt];
+
+            // Format next number based on doc type
+            let nextFormatted: string;
+            if (dt === "INVOICE" || dt === "CREDIT_NOTE") {
+                const yy = String(year % 100).padStart(2, "0");
+                const nn = String(nextNumber).padStart(2, "0");
+                nextFormatted = `${prefix}${yy}/${nn}`;
+            } else {
+                nextFormatted = `${prefix}-${year}-${String(nextNumber).padStart(4, "0")}`;
+            }
+
             return {
                 docType: dt,
                 prefix,
                 year,
                 currentNumber,
                 nextNumber,
-                nextFormatted: `${prefix}-${year}-${String(nextNumber).padStart(4, "0")}`,
+                nextFormatted,
             };
         });
 

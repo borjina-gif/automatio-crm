@@ -33,12 +33,12 @@ export async function POST(
 
         // Atomic: get number + update status
         const updated = await prisma.$transaction(async (tx) => {
-            const { number } = await getNextNumber(docType, year, companyId);
+            const { formatted } = await getNextNumber(docType, year, companyId);
 
             return tx.invoice.update({
                 where: { id },
                 data: {
-                    number,
+                    number: formatted,
                     year,
                     status: "ISSUED",
                     issueDate,

@@ -27,11 +27,20 @@ export default function InvoiceDetailPage() {
     const [actionLoading, setActionLoading] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         fetch(`/api/invoices/${id}`)
             .then((r) => r.json())
-            .then(setInvoice)
+            .then((data) => {
+                setInvoice(data);
+                // Fetch documents after loading invoice
+                fetch(`/api/documents/upload?entityType=INVOICE&entityId=${id}`)
+                    .then((r) => r.json())
+                    .then((docs) => { if (Array.isArray(docs)) setDocuments(docs); })
+                    .catch(console.error);
+            })
             .catch(console.error)
             .finally(() => setLoading(false));
     }, [id]);
@@ -129,9 +138,7 @@ export default function InvoiceDetailPage() {
             <div className="page-header">
                 <div>
                     <h1>
-                        {invoice.number
-                            ? `${invoice.type === "CREDIT_NOTE" ? "REC" : "FAC"}-${invoice.year}-${String(invoice.number).padStart(4, "0")}`
-                            : "Factura (Borrador)"}
+                        {invoice.number || "Factura (Borrador)"}
                     </h1>
                     <p className="page-header-sub">
                         <span className={`badge ${st.class}`}>{st.label}</span>
@@ -276,6 +283,106 @@ export default function InvoiceDetailPage() {
                             </>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* Adjuntos */}
+            <div className="card" style={{ marginTop: 20 }}>
+                <div className="card-body">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>📎 Adjuntos</h3>
+                        <label
+                            className="btn btn-secondary btn-sm"
+                            style={{ cursor: "pointer", opacity: uploading ? 0.6 : 1 }}
+                        >
+                            {uploading ? "Subiendo..." : "+ Subir archivo"}
+                            <input
+                                type="file"
+                                style={{ display: "none" }}
+                                disabled={uploading}
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setUploading(true);
+                                    setError("");
+                                    try {
+                                        const fd = new FormData();
+                                        fd.append("file", file);
+                                        fd.append("entityType", "INVOICE");
+                                        fd.append("entityId", id as string);
+                                        const res = await fetch("/api/documents/upload", {
+                                            method: "POST",
+                                            body: fd,
+                                        });
+                                        if (!res.ok) throw new Error((await res.json()).error);
+                                        const doc = await res.json();
+                                        setDocuments((prev) => [doc, ...prev]);
+                                        setSuccess("✅ Archivo subido");
+                                        setTimeout(() => setSuccess(""), 3000);
+                                    } catch (err: any) {
+                                        setError(err.message || "Error al subir archivo");
+                                    } finally {
+                                        setUploading(false);
+                                        e.target.value = "";
+                                    }
+                                }}
+                            />
+                        </label>
+                    </div>
+
+                    {documents.length === 0 ? (
+                        <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+                            Sin adjuntos. Sube facturas originales, contratos u otros documentos.
+                        </p>
+                    ) : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Archivo</th>
+                                    <th>Tamaño</th>
+                                    <th>Fecha</th>
+                                    <th style={{ width: 100 }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {documents.map((doc) => (
+                                    <tr key={doc.id}>
+                                        <td className="cell-primary">{doc.filename}</td>
+                                        <td>{(doc.sizeBytes / 1024).toFixed(1)} KB</td>
+                                        <td>{new Date(doc.createdAt).toLocaleDateString("es-ES")}</td>
+                                        <td style={{ display: "flex", gap: 6 }}>
+                                            <a
+                                                href={`/api/documents/${doc.id}/download`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="btn btn-ghost btn-sm"
+                                            >
+                                                ⬇
+                                            </a>
+                                            <button
+                                                className="btn btn-danger btn-sm"
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!confirm("¿Eliminar este adjunto?")) return;
+                                                    try {
+                                                        const res = await fetch(`/api/documents/${doc.id}/download`, {
+                                                            method: "DELETE",
+                                                        });
+                                                        if (!res.ok) throw new Error("Error");
+                                                        setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                                                    } catch {
+                                                        setError("Error al eliminar adjunto");
+                                                    }
+                                                }}
+                                            >
+                                                🗑
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
         </>

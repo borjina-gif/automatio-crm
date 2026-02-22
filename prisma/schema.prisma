@@ -79,6 +79,11 @@ enum RecurringFrequency {
   YEARLY
 }
 
+enum RecurringMode {
+  GENERATE_ONLY
+  GENERATE_AND_SEND
+}
+
 enum RecurringTemplateStatus {
   ACTIVE
   PAUSED
@@ -89,6 +94,17 @@ enum RecurringRunStatus {
   REVIEWED
   ISSUED
   SKIPPED
+  SUCCESS
+  FAILED
+}
+
+enum DocumentEntityType {
+  INVOICE
+  QUOTE
+  PURCHASE_INVOICE
+  CLIENT
+  PROVIDER
+  SERVICE
 }
 
 enum AuditAction {
@@ -335,7 +351,7 @@ model Invoice {
   companyId            String          @map("company_id") @db.Uuid
   clientId             String          @map("client_id") @db.Uuid
   year                 Int?
-  number               Int?                                  // Assigned on emit
+  number               String?                               // e.g. "F26/03" — assigned on emit
   type                 InvoiceType     @default(INVOICE)
   status               InvoiceStatus   @default(DRAFT)
   issueDate            DateTime?       @map("issue_date")
@@ -471,6 +487,7 @@ model RecurringTemplate {
   frequency   RecurringFrequency
   dayOfMonth  Int?                    @map("day_of_month")
   nextRunDate DateTime                @map("next_run_date")
+  mode        RecurringMode           @default(GENERATE_AND_SEND)
   status      RecurringTemplateStatus @default(ACTIVE)
   currency    String                  @default("EUR")
   notes       String?
@@ -507,12 +524,31 @@ model RecurringRun {
   status                RecurringRunStatus  @default(GENERATED)
   generatedInvoiceId    String?             @map("generated_invoice_id") @db.Uuid
   idempotencyKey        String              @unique @map("idempotency_key")
+  errorMessage          String?             @map("error_message")
   createdAt             DateTime            @default(now()) @map("created_at")
   updatedAt             DateTime            @updatedAt @map("updated_at")
 
   recurringTemplate     RecurringTemplate   @relation(fields: [recurringTemplateId], references: [id])
 
   @@map("recurring_runs")
+}
+
+// ─── DOCUMENTS / ATTACHMENTS ────────────────────────────────
+
+model Document {
+  id                String             @id @default(uuid()) @db.Uuid
+  companyId         String             @map("company_id") @db.Uuid
+  entityType        DocumentEntityType @map("entity_type")
+  entityId          String             @map("entity_id") @db.Uuid
+  filename          String
+  mimeType          String             @map("mime_type")
+  sizeBytes         Int                @map("size_bytes")
+  storagePath       String             @map("storage_path")
+  uploadedByUserId  String?            @map("uploaded_by_user_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("documents")
 }
 
 // ─── ACTIVITY LOG ────────────────────────────────────────────

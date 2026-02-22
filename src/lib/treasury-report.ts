@@ -112,9 +112,7 @@ export async function buildQuarterlyReport(
 
         const salesRows: InvoiceSummaryRow[] = invoices.map((inv) => ({
             id: inv.id,
-            number: inv.number
-                ? `${inv.year}-${String(inv.number).padStart(4, "0")}`
-                : "BORRADOR",
+            number: inv.number || "BORRADOR",
             counterpartyName: inv.client?.name || "—",
             issueDate: inv.issueDate?.toISOString().split("T")[0] || "—",
             subtotalCents: inv.subtotalCents,

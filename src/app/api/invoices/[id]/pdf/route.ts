@@ -28,9 +28,8 @@ export async function GET(
 
         const pdfBuffer = generateInvoicePDF(invoice, company);
 
-        const prefix = invoice.type === "CREDIT_NOTE" ? "REC" : "FAC";
         const filename = invoice.number
-            ? `${prefix}-${invoice.year}-${String(invoice.number).padStart(4, "0")}.pdf`
+            ? `${invoice.number.replace(/\//g, "-")}.pdf`
             : `factura-borrador-${id.slice(0, 8)}.pdf`;
 
         return new Response(new Uint8Array(pdfBuffer), {

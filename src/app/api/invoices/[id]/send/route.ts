@@ -44,10 +44,7 @@ export async function POST(
 
         // Generate PDF
         const pdfBuffer = generateInvoicePDF(invoice, company);
-        const prefix = invoice.type === "CREDIT_NOTE" ? "REC" : "FAC";
-        const docNumber = invoice.number
-            ? `${prefix}-${invoice.year}-${String(invoice.number).padStart(4, "0")}`
-            : "BORRADOR";
+        const docNumber = invoice.number || "BORRADOR";
         const totalFormatted = (invoice.totalCents / 100).toLocaleString("es-ES", {
             minimumFractionDigits: 2,
         });

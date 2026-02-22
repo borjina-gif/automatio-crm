@@ -70,7 +70,7 @@ export default function BillingSettingsPage() {
         <div style={{ maxWidth: 720 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Numeración y Facturación</h2>
             <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 24 }}>
-                Series de numeración con reinicio anual automático. Formato: PREFIJO-AÑO-NÚMERO
+                Series de numeración con reinicio anual automático. Facturas: F{'{'}YY{'}'}/{'{'}NN{'}'} · Presupuestos: PRE-AÑO-NÚMERO
             </p>
 
             {counters.map((c) => (

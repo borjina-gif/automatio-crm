@@ -490,10 +490,7 @@ export function generateQuotePDF(quote: any, company: CompanyInfo): Buffer {
 }
 
 export function generateInvoicePDF(invoice: any, company: CompanyInfo): Buffer {
-    const prefix = invoice.type === "CREDIT_NOTE" ? "REC" : "FAC";
-    const docNumber = invoice.number
-        ? `${prefix}-${invoice.year}-${String(invoice.number).padStart(4, "0")}`
-        : "BORRADOR";
+    const docNumber = invoice.number || "BORRADOR";
 
     return generateDocumentPDF({
         docType: "invoice",

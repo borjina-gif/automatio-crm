@@ -205,6 +205,14 @@ export default function InvoicesPage() {
                     <h1>Facturas</h1>
                     <p className="page-header-sub">{invoices.length} facturas</p>
                 </div>
+                <div className="flex gap-2">
+                    <Link href="/invoices/recurring" className="btn btn-secondary">
+                        🔄 Recurrentes
+                    </Link>
+                    <Link href="/invoices/new" className="btn btn-primary">
+                        + Nueva factura
+                    </Link>
+                </div>
             </div>
 
             {/* Status filter tabs */}
@@ -233,7 +241,10 @@ export default function InvoicesPage() {
                     <div className="empty-state">
                         <div className="empty-state-icon">📄</div>
                         <h3>No hay facturas</h3>
-                        <p>Las facturas se generan a partir de presupuestos aceptados</p>
+                        <p>Crea una factura directamente o conviértelas desde presupuestos</p>
+                        <Link href="/invoices/new" className="btn btn-primary" style={{ marginTop: 12 }}>
+                            + Nueva factura
+                        </Link>
                     </div>
                 ) : (
                     <table className="data-table">
@@ -259,9 +270,7 @@ export default function InvoicesPage() {
                                         onClick={() => router.push(`/invoices/${inv.id}`)}
                                     >
                                         <td className="cell-mono cell-primary">
-                                            {inv.number
-                                                ? `${inv.type === "CREDIT_NOTE" ? "R" : "F"}-${inv.year}-${String(inv.number).padStart(4, "0")}`
-                                                : "Borrador"}
+                                            {inv.number || "Borrador"}
                                         </td>
                                         <td className="cell-primary">{inv.client.name}</td>
                                         <td>
