@@ -67,8 +67,12 @@ export async function POST(
         });
 
         return NextResponse.json({ success: true, sentTo: quote.client.email });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error sending quote:", error);
-        return NextResponse.json({ error: "Error al enviar presupuesto por email" }, { status: 500 });
+        const msg = error?.message || "Error desconocido";
+        return NextResponse.json(
+            { error: `Error al enviar presupuesto por email: ${msg}` },
+            { status: 500 }
+        );
     }
 }

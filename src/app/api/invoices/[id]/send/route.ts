@@ -68,8 +68,12 @@ export async function POST(
         });
 
         return NextResponse.json({ success: true, sentTo: invoice.client.email });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error sending invoice:", error);
-        return NextResponse.json({ error: "Error al enviar factura por email" }, { status: 500 });
+        const msg = error?.message || "Error desconocido";
+        return NextResponse.json(
+            { error: `Error al enviar factura por email: ${msg}` },
+            { status: 500 }
+        );
     }
 }
