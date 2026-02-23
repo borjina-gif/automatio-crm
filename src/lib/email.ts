@@ -1,24 +1,22 @@
 // ============================================================
 // Automatio CRM — Email Service
-// SMTP-based email sending with nodemailer
+// Uses Resend API for reliable email delivery
+// Env var needed: RESEND_API_KEY
 // ============================================================
 
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "localhost",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true",
-    auth:
-        process.env.SMTP_USER && process.env.SMTP_PASS
-            ? {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            }
-            : undefined,
-});
+function getResend(): Resend {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        throw new Error(
+            "RESEND_API_KEY no configurada. Añádela en Vercel → Settings → Environment Variables."
+        );
+    }
+    return new Resend(apiKey);
+}
 
-const FROM = process.env.SMTP_FROM || "Automatio CRM <info@automatio.es>";
+const FROM = process.env.EMAIL_FROM || "Automatio CRM <onboarding@resend.dev>";
 
 /**
  * Send a document email with PDF attachment.
@@ -30,19 +28,25 @@ export async function sendDocumentEmail(
     pdfBuffer: Buffer,
     pdfFilename: string
 ): Promise<void> {
-    await transporter.sendMail({
+    const resend = getResend();
+
+    const { error } = await resend.emails.send({
         from: FROM,
-        to,
+        to: [to],
         subject,
         html: htmlBody,
         attachments: [
             {
                 filename: pdfFilename,
-                content: pdfBuffer,
-                contentType: "application/pdf",
+                content: pdfBuffer.toString("base64"),
             },
         ],
     });
+
+    if (error) {
+        console.error("Resend error:", error);
+        throw new Error(`Error enviando email: ${error.message}`);
+    }
 }
 
 /**

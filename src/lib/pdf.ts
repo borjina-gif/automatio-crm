@@ -104,13 +104,15 @@ const PAGE_BOTTOM = PAGE_H - MB;
 const LINE_H = 4;        // standard line height for 8.5-9pt text
 
 // ─── TABLE COLUMN POSITIONS ─────────────────────────────────
+// A4 = 210mm, ML=20, MR=20 → content = 170mm
+// Concept: 20..88 (68mm) | Precio: 98 | Uds: 116 | Subtotal: 136 | IVA: 154 | Total: 190(RE)
 
 const COL_CONCEPTO = ML;
-const COL_PRECIO = ML + 90;
-const COL_UNIDADES = ML + 112;
-const COL_SUBTOTAL = ML + 132;
-const COL_IVA = ML + 150;
-const DESC_MAX_W = 82;  // max width for description text wrapping
+const COL_PRECIO = ML + 78;
+const COL_UNIDADES = ML + 98;
+const COL_SUBTOTAL = ML + 118;
+const COL_IVA = ML + 138;
+const DESC_MAX_W = 68;  // max width for description text wrapping (with 10mm gap to PRECIO)
 
 // ─── PDF GENERATOR ──────────────────────────────────────────
 
