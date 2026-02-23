@@ -249,6 +249,7 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     companyLines.push(data.company.legalName);
     if (data.company.tradeName && data.company.tradeName !== data.company.legalName)
         companyLines.push(data.company.tradeName);
+    if (data.company.taxId) companyLines.push(`CIF: ${data.company.taxId}`);
     if (data.company.addressLine1) companyLines.push(data.company.addressLine1);
     const companyLoc = [
         data.company.postalCode,
@@ -258,7 +259,6 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     if (companyLoc) companyLines.push(companyLoc);
     const companyCountry = data.company.country === "ES" ? "España" : data.company.country;
     if (companyCountry) companyLines.push(companyCountry);
-    if (data.company.taxId) companyLines.push(data.company.taxId);
     if (data.company.email) companyLines.push(data.company.email);
 
     // Column 2: Dirección de envío
@@ -283,7 +283,7 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     ].filter(Boolean).join(", ");
     if (clientLoc) clientLines.push(clientLoc);
     clientLines.push("España");
-    if (data.client.taxId) clientLines.push(data.client.taxId);
+    if (data.client.taxId) clientLines.push(`NIF/CIF: ${data.client.taxId}`);
 
     // — Draw columns with splitTextToSize for proper wrapping —
 
