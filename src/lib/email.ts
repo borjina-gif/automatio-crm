@@ -1,22 +1,36 @@
 // ============================================================
 // Automatio CRM — Email Service
-// Uses Resend API for reliable email delivery
-// Env var needed: RESEND_API_KEY
+// SMTP-based email sending with nodemailer
+// Env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 // ============================================================
 
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-function getResend(): Resend {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
+function getTransporter() {
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || "465");
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    if (!host || !user || !pass) {
         throw new Error(
-            "RESEND_API_KEY no configurada. Añádela en Vercel → Settings → Environment Variables."
+            "SMTP no configurado. Añade SMTP_HOST, SMTP_USER y SMTP_PASS en las variables de entorno."
         );
     }
-    return new Resend(apiKey);
+
+    return nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465, // SSL for 465, STARTTLS for 587
+        auth: { user, pass },
+        tls: {
+            // Allow self-signed certs from mail.automatio.es
+            rejectUnauthorized: false,
+        },
+    });
 }
 
-const FROM = process.env.EMAIL_FROM || "Automatio CRM <onboarding@resend.dev>";
+const FROM = process.env.SMTP_FROM || "Automatio solutions S.L <info@automatio.es>";
 
 /**
  * Send a document email with PDF attachment.
@@ -28,25 +42,21 @@ export async function sendDocumentEmail(
     pdfBuffer: Buffer,
     pdfFilename: string
 ): Promise<void> {
-    const resend = getResend();
+    const transporter = getTransporter();
 
-    const { error } = await resend.emails.send({
+    await transporter.sendMail({
         from: FROM,
-        to: [to],
+        to,
         subject,
         html: htmlBody,
         attachments: [
             {
                 filename: pdfFilename,
-                content: pdfBuffer.toString("base64"),
+                content: pdfBuffer,
+                contentType: "application/pdf",
             },
         ],
     });
-
-    if (error) {
-        console.error("Resend error:", error);
-        throw new Error(`Error enviando email: ${error.message}`);
-    }
 }
 
 /**
