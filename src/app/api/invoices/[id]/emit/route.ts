@@ -24,9 +24,11 @@ export async function POST(
         const year = new Date().getFullYear();
         const companyId = invoice.companyId;
         const docType = invoice.type === "CREDIT_NOTE" ? "CREDIT_NOTE" : "INVOICE";
-        const issueDate = new Date();
 
-        // Calculate due date from client payment terms
+        // Preserve the date the user set manually; only default to today if blank
+        const issueDate = invoice.issueDate ?? new Date();
+
+        // Calculate due date from the effective issue date
         const termsDays = invoice.client?.paymentTermsDays ?? 30;
         const dueDate = new Date(issueDate);
         dueDate.setDate(dueDate.getDate() + termsDays);

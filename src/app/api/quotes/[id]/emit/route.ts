@@ -32,7 +32,7 @@ export async function POST(
                     number,
                     year,
                     status: "SENT",
-                    issueDate: new Date(),
+                    issueDate: quote.issueDate ?? new Date(),
                 },
                 include: {
                     client: { select: { id: true, name: true, taxId: true, email: true } },
