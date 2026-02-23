@@ -1,5 +1,6 @@
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { SidebarProvider } from "@/components/layout/SidebarContext";
 
 export default function DashboardLayout({
     children,
@@ -7,12 +8,14 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="app-layout">
-            <Sidebar />
-            <div className="main-content">
-                <Topbar />
-                <main className="page-content">{children}</main>
+        <SidebarProvider>
+            <div className="app-layout">
+                <Sidebar />
+                <div className="main-content">
+                    <Topbar />
+                    <main className="page-content">{children}</main>
+                </div>
             </div>
-        </div>
+        </SidebarProvider>
     );
 }

@@ -82,7 +82,7 @@ function fmtDate(d: Date | string | null | undefined): string {
 
 // ─── COLORS ─────────────────────────────────────────────────
 
-const BRAND_NAVY: [number, number, number] = [27, 22, 96];   // #1b1660
+const BRAND_NAVY: [number, number, number] = [27, 22, 96];
 const TEXT_DARK: [number, number, number] = [40, 40, 50];
 const TEXT_MEDIUM: [number, number, number] = [100, 100, 115];
 const TEXT_LIGHT: [number, number, number] = [140, 140, 155];
@@ -90,55 +90,77 @@ const LINE_COLOR: [number, number, number] = [210, 210, 220];
 
 const IBAN = "ES4120854503000330904034";
 
+// ─── LAYOUT CONSTANTS ───────────────────────────────────────
+
+const PAGE_W = 210;
+const PAGE_H = 297;
+const ML = 20;           // margin left
+const MR = 20;           // margin right
+const MT = 20;           // margin top
+const MB = 25;           // margin bottom (footer space)
+const CW = PAGE_W - ML - MR;   // content width
+const RE = PAGE_W - MR;        // right edge
+const PAGE_BOTTOM = PAGE_H - MB;
+const LINE_H = 4;        // standard line height for 8.5-9pt text
+
+// ─── TABLE COLUMN POSITIONS ─────────────────────────────────
+
+const COL_CONCEPTO = ML;
+const COL_PRECIO = ML + 90;
+const COL_UNIDADES = ML + 112;
+const COL_SUBTOTAL = ML + 132;
+const COL_IVA = ML + 150;
+const DESC_MAX_W = 82;  // max width for description text wrapping
+
 // ─── PDF GENERATOR ──────────────────────────────────────────
 
 export function generateDocumentPDF(data: DocumentData): Buffer {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const marginLeft = 20;
-    const marginRight = 20;
-    const contentWidth = pageWidth - marginLeft - marginRight;
-    const rightEdge = pageWidth - marginRight;
-    let y = 20;
+    let y = MT;
     let pageNumber = 1;
 
-    // ── HELPER: draw footer on current page ─────────────
-    function drawPageFooter() {
-        const footerY = pageHeight - 12;
-        doc.setDrawColor(...LINE_COLOR);
-        doc.line(marginLeft, footerY - 4, rightEdge, footerY - 4);
-
-        doc.setFontSize(7);
-        doc.setTextColor(...TEXT_LIGHT);
-        doc.setFont("helvetica", "normal");
-
-        // Left: doc number + total + due date
-        const footerParts: string[] = [data.docNumber];
-        if (data.totalCents) footerParts.push(`${fmtCents(data.totalCents)}€`);
-        if (data.dueDate) footerParts.push(`Vencimiento ${fmtDate(data.dueDate)}`);
-        if (data.validUntil) footerParts.push(`Válido hasta ${fmtDate(data.validUntil)}`);
-        doc.text(footerParts.join(" - "), marginLeft, footerY);
-
-        // Right: page number
-        doc.text(`Pág. ${pageNumber} de {PAGES}`, rightEdge, footerY, { align: "right" });
+    // ── HELPER: page break if needed ───────────────────
+    function needsBreak(space: number): boolean {
+        return y + space > PAGE_BOTTOM;
     }
 
-    // ── HELPER: check page break ────────────────────────
-    function checkPageBreak(neededSpace: number) {
-        if (y + neededSpace > pageHeight - 20) {
-            drawPageFooter();
-            doc.addPage();
-            pageNumber++;
-            y = 20;
+    function pageBreak() {
+        doc.addPage();
+        pageNumber++;
+        y = MT;
+    }
+
+    function ensureSpace(space: number) {
+        if (needsBreak(space)) pageBreak();
+    }
+
+    // ── HELPER: draw wrapped text in a column ──────────
+    // Returns array of lines and the height consumed
+    function drawWrappedText(
+        text: string,
+        x: number,
+        startY: number,
+        maxW: number,
+        fontSize: number,
+        fontStyle: "normal" | "bold" = "normal",
+        color: [number, number, number] = TEXT_MEDIUM,
+        lineHeight: number = LINE_H
+    ): { lines: string[]; height: number } {
+        doc.setFontSize(fontSize);
+        doc.setFont("helvetica", fontStyle);
+        doc.setTextColor(...color);
+
+        const lines = doc.splitTextToSize(text, maxW) as string[];
+        for (let i = 0; i < lines.length; i++) {
+            doc.text(lines[i], x, startY + i * lineHeight);
         }
+        return { lines, height: lines.length * lineHeight };
     }
 
     // ══════════════════════════════════════════════════════
     // 1. HEADER: Title + Logo
     // ══════════════════════════════════════════════════════
 
-    // Document type title (left)
     const docTitle =
         data.docType === "quote"
             ? "Presupuesto"
@@ -149,13 +171,13 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     doc.setTextColor(...TEXT_DARK);
     doc.setFontSize(26);
     doc.setFont("helvetica", "bold");
-    doc.text(docTitle, marginLeft, y + 8);
+    doc.text(docTitle, ML, y + 8);
 
     // Logo (top-right corner)
     try {
         const logoW = 35;
         const logoH = 35;
-        doc.addImage(LOGO_BASE64, "PNG", rightEdge - logoW, y - 5, logoW, logoH);
+        doc.addImage(LOGO_BASE64, "PNG", RE - logoW, y - 5, logoW, logoH);
     } catch {
         // If logo fails, skip silently
     }
@@ -166,11 +188,10 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     // 2. DOCUMENT METADATA (Number, Date, Due Date)
     // ══════════════════════════════════════════════════════
 
-    doc.setFontSize(9);
-    const metaLabelX = marginLeft + 2;
-    const metaValueX = marginLeft + 32;
+    const metaLabelX = ML + 2;
+    const metaValueX = ML + 32;
 
-    // Number
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...TEXT_MEDIUM);
     doc.text("Número #", metaLabelX, y);
@@ -179,7 +200,6 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     doc.text(data.docNumber, metaValueX, y);
     y += 5;
 
-    // Issue date
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...TEXT_MEDIUM);
     doc.text("Fecha", metaLabelX, y);
@@ -188,7 +208,6 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     doc.text(fmtDate(data.issueDate), metaValueX, y);
     y += 5;
 
-    // Due date / Valid until
     if (data.dueDate) {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...TEXT_MEDIUM);
@@ -211,162 +230,183 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
 
     // ══════════════════════════════════════════════════════
     // 3. COMPANY / SHIPPING / CLIENT — 3 Columns
+    //    Each column wraps text within its max width
     // ══════════════════════════════════════════════════════
 
-    const col1X = marginLeft;
-    const col2X = marginLeft + contentWidth * 0.38;
-    const col3X = marginLeft + contentWidth * 0.68;
+    const col1X = ML;
+    const col2X = ML + CW * 0.36;
+    const col3X = ML + CW * 0.66;
+    const col1W = CW * 0.34;   // column 1 width
+    const col2W = CW * 0.28;   // column 2 width
+    const col3W = CW * 0.32;   // column 3 width
 
     const blockStartY = y;
 
-    // ── Column 1: Emisor (Company) ──
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...TEXT_DARK);
-    doc.text(data.company.legalName, col1X, y);
-    y += 4.5;
+    // — Pre-compute all column content as wrapped lines —
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...TEXT_MEDIUM);
+    // Column 1: Emisor (Company)
+    const companyLines: string[] = [];
+    companyLines.push(data.company.legalName);
+    if (data.company.tradeName && data.company.tradeName !== data.company.legalName)
+        companyLines.push(data.company.tradeName);
+    if (data.company.addressLine1) companyLines.push(data.company.addressLine1);
+    const companyLoc = [
+        data.company.postalCode,
+        data.company.city,
+        data.company.province,
+    ].filter(Boolean).join(", ");
+    if (companyLoc) companyLines.push(companyLoc);
+    const companyCountry = data.company.country === "ES" ? "España" : data.company.country;
+    if (companyCountry) companyLines.push(companyCountry);
+    if (data.company.taxId) companyLines.push(data.company.taxId);
+    if (data.company.email) companyLines.push(data.company.email);
 
-    const companyDetails = [
-        data.company.tradeName && data.company.tradeName !== data.company.legalName
-            ? data.company.tradeName
-            : null,
-        data.company.addressLine1,
-        [data.company.postalCode ? `${data.company.postalCode} (${data.company.city})` : data.company.city, data.company.province, data.company.country === "ES" ? "España" : data.company.country]
-            .filter(Boolean)
-            .join(", ") || null,
-        data.company.taxId,
-        data.company.phone,
-        data.company.email,
-    ].filter(Boolean) as string[];
+    // Column 2: Dirección de envío
+    const shippingLines: string[] = [];
+    if (data.client.billingAddressLine1) shippingLines.push(data.client.billingAddressLine1);
+    const shipLoc = [
+        data.client.billingPostalCode,
+        data.client.billingCity,
+        data.client.billingProvince,
+    ].filter(Boolean).join(", ");
+    if (shipLoc) shippingLines.push(shipLoc);
+    shippingLines.push("España");
 
-    companyDetails.forEach((line) => {
-        doc.text(line, col1X, y);
-        y += 4;
-    });
+    // Column 3: Cliente
+    const clientLines: string[] = [];
+    clientLines.push(data.client.name);
+    if (data.client.billingAddressLine1) clientLines.push(data.client.billingAddressLine1);
+    const clientLoc = [
+        data.client.billingPostalCode,
+        data.client.billingCity,
+        data.client.billingProvince,
+    ].filter(Boolean).join(", ");
+    if (clientLoc) clientLines.push(clientLoc);
+    clientLines.push("España");
+    if (data.client.taxId) clientLines.push(data.client.taxId);
 
-    // ── Column 2: Dirección de envío ──
-    let yCol2 = blockStartY;
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...TEXT_MEDIUM);
-    doc.text("Dirección de envío", col2X, yCol2);
-    yCol2 += 4.5;
+    // — Draw columns with splitTextToSize for proper wrapping —
 
-    doc.setFont("helvetica", "normal");
-    const shippingAddress = [
-        data.client.billingAddressLine1,
-        [data.client.billingPostalCode, data.client.billingCity, data.client.billingProvince]
-            .filter(Boolean)
-            .join(", ") || null,
-        "España",
-    ].filter(Boolean) as string[];
+    function drawColumn(
+        lines: string[],
+        x: number,
+        startY: number,
+        maxW: number,
+        title?: string,
+    ): number {
+        let cy = startY;
 
-    shippingAddress.forEach((line) => {
-        doc.text(line, col2X, yCol2);
-        yCol2 += 4;
-    });
+        if (title) {
+            doc.setFontSize(8.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...TEXT_MEDIUM);
+            doc.text(title, x, cy);
+            cy += 5;
+        }
 
-    // ── Column 3: Cliente ──
-    let yCol3 = blockStartY;
-    doc.setFontSize(8.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...TEXT_MEDIUM);
-    doc.text("Cliente", col3X, yCol3);
-    yCol3 += 4.5;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...TEXT_MEDIUM);
 
-    doc.setFont("helvetica", "normal");
-    const clientDetails = [
-        data.client.name,
-        data.client.billingAddressLine1,
-        [data.client.billingPostalCode, data.client.billingCity, data.client.billingProvince]
-            .filter(Boolean)
-            .join(", ") || null,
-        "España",
-        data.client.taxId,
-    ].filter(Boolean) as string[];
+        for (let i = 0; i < lines.length; i++) {
+            // First line of company is bold
+            if (!title && i === 0) {
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(...TEXT_DARK);
+            } else {
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(...TEXT_MEDIUM);
+            }
 
-    clientDetails.forEach((line) => {
-        doc.text(line, col3X, yCol3);
-        yCol3 += 4;
-    });
+            const wrapped = doc.splitTextToSize(lines[i], maxW) as string[];
+            for (const wl of wrapped) {
+                doc.text(wl, x, cy);
+                cy += LINE_H;
+            }
+        }
 
-    y = Math.max(y, yCol2, yCol3) + 8;
+        return cy;
+    }
 
-    // ── Separator line ──
+    const endCol1 = drawColumn(companyLines, col1X, blockStartY, col1W);
+    const endCol2 = drawColumn(shippingLines, col2X, blockStartY, col2W, "Dirección de envío");
+    const endCol3 = drawColumn(clientLines, col3X, blockStartY, col3W, "Cliente");
+
+    y = Math.max(endCol1, endCol2, endCol3) + 8;
+
+    // Separator line
     doc.setDrawColor(...LINE_COLOR);
-    doc.line(marginLeft, y, rightEdge, y);
+    doc.line(ML, y, RE, y);
     y += 6;
 
     // ══════════════════════════════════════════════════════
-    // 4. TABLE HEADER
+    // 4. TABLE — Header + Rows with proper page breaks
     // ══════════════════════════════════════════════════════
 
-    const colConcepto = marginLeft;
-    const colPrecio = marginLeft + 85;
-    const colUnidades = marginLeft + 107;
-    const colSubtotal = marginLeft + 127;
-    const colIva = marginLeft + 147;
-    const colTotal = marginLeft + 160;
+    function drawTableHeader() {
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...TEXT_LIGHT);
 
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...TEXT_LIGHT);
+        doc.text("CONCEPTO", COL_CONCEPTO, y);
+        doc.text("PRECIO", COL_PRECIO, y, { align: "right" });
+        doc.text("UNIDADES", COL_UNIDADES, y, { align: "right" });
+        doc.text("SUBTOTAL", COL_SUBTOTAL, y, { align: "right" });
+        doc.text("IVA", COL_IVA, y, { align: "right" });
+        doc.text("TOTAL", RE, y, { align: "right" });
 
-    doc.text("CONCEPTO", colConcepto, y);
-    doc.text("PRECIO", colPrecio, y, { align: "right" });
-    doc.text("UNIDADES", colUnidades, y, { align: "right" });
-    doc.text("SUBTOTAL", colSubtotal, y, { align: "right" });
-    doc.text("IVA", colIva, y, { align: "right" });
-    doc.text("TOTAL", rightEdge, y, { align: "right" });
+        y += 3;
+        doc.setDrawColor(...LINE_COLOR);
+        doc.line(ML, y, RE, y);
+        y += 5;
+    }
 
-    y += 3;
-    doc.setDrawColor(...LINE_COLOR);
-    doc.line(marginLeft, y, rightEdge, y);
-    y += 6;
+    drawTableHeader();
 
-    // ══════════════════════════════════════════════════════
-    // 5. TABLE ROWS
-    // ══════════════════════════════════════════════════════
-
+    // Draw each row
     doc.setFontSize(9);
 
-    data.lines.forEach((line) => {
-        checkPageBreak(10);
+    for (const line of data.lines) {
+        // Pre-calculate row height from description wrapping
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        const descLines = doc.splitTextToSize(line.description, DESC_MAX_W) as string[];
+        const rowHeight = Math.max(descLines.length * 4.5, 7);
 
+        // Page break if needed — redraw header on new page
+        if (needsBreak(rowHeight + 2)) {
+            pageBreak();
+            drawTableHeader();
+        }
+
+        // Description
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...TEXT_DARK);
+        doc.text(descLines, COL_CONCEPTO, y);
 
-        // Description — wrap if too long
-        const descMaxW = 78;
-        const descLines = doc.splitTextToSize(line.description, descMaxW);
-        doc.text(descLines, colConcepto, y);
+        // Numeric columns (aligned to first line of description)
+        doc.text(`${fmtCents(line.unitPriceCents)}€`, COL_PRECIO, y, { align: "right" });
+        doc.text(String(Number(line.quantity)), COL_UNIDADES, y, { align: "right" });
+        doc.text(`${fmtCents(line.lineSubtotalCents)}€`, COL_SUBTOTAL, y, { align: "right" });
+        doc.text(line.tax ? `${line.tax.rate}%` : "—", COL_IVA, y, { align: "right" });
+        doc.text(`${fmtCents(line.lineTotalCents)}€`, RE, y, { align: "right" });
 
-        // Numeric columns
-        doc.text(`${fmtCents(line.unitPriceCents)}€`, colPrecio, y, { align: "right" });
-        doc.text(String(Number(line.quantity)), colUnidades, y, { align: "right" });
-        doc.text(`${fmtCents(line.lineSubtotalCents)}€`, colSubtotal, y, { align: "right" });
-        doc.text(line.tax ? `${line.tax.rate}%` : "—", colIva, y, { align: "right" });
-        doc.text(`${fmtCents(line.lineTotalCents)}€`, rightEdge, y, { align: "right" });
+        y += rowHeight;
+    }
 
-        y += Math.max(descLines.length * 4.5, 7);
-    });
-
+    // Bottom line under table
     y += 2;
     doc.setDrawColor(...LINE_COLOR);
-    doc.line(marginLeft + contentWidth * 0.5, y, rightEdge, y);
+    doc.line(ML + CW * 0.5, y, RE, y);
     y += 8;
 
     // ══════════════════════════════════════════════════════
-    // 6. TOTALS BLOCK (right-aligned)
+    // 5. TOTALS BLOCK (right-aligned)
     // ══════════════════════════════════════════════════════
 
-    checkPageBreak(35);
+    ensureSpace(35);
 
-    const totalsLabelX = marginLeft + contentWidth * 0.5;
+    const totalsLabelX = ML + CW * 0.5;
 
     // Base Imponible
     doc.setFontSize(9);
@@ -374,77 +414,75 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     doc.setTextColor(...TEXT_DARK);
     doc.text("BASE IMPONIBLE", totalsLabelX, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`${fmtCents(data.subtotalCents)}€`, rightEdge, y, { align: "right" });
+    doc.text(`${fmtCents(data.subtotalCents)}€`, RE, y, { align: "right" });
     y += 7;
 
-    // IVA — detect rate from lines
+    // IVA
     const taxRate = data.lines.find((l) => l.tax?.rate)?.tax?.rate;
     const ivaLabel = taxRate ? `IVA ${taxRate}%` : "IVA";
     doc.setFont("helvetica", "bold");
     doc.text(ivaLabel, totalsLabelX, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`${fmtCents(data.taxCents)}€`, rightEdge, y, { align: "right" });
+    doc.text(`${fmtCents(data.taxCents)}€`, RE, y, { align: "right" });
     y += 7;
 
     // TOTAL
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text("TOTAL", totalsLabelX, y);
-    doc.text(`${fmtCents(data.totalCents)}€`, rightEdge, y, { align: "right" });
-
+    doc.text(`${fmtCents(data.totalCents)}€`, RE, y, { align: "right" });
     y += 14;
 
     // ══════════════════════════════════════════════════════
-    // 7. PAYMENT CONDITIONS
+    // 6. PAYMENT CONDITIONS
     // ══════════════════════════════════════════════════════
 
-    checkPageBreak(25);
+    ensureSpace(25);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...TEXT_DARK);
-    doc.text("Condiciones de pago", marginLeft, y);
+    doc.text("Condiciones de pago", ML, y);
     y += 5;
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...TEXT_MEDIUM);
-    doc.text(
-        `Pagar por transferencia bancaria al siguiente número de cuenta: ${IBAN}`,
-        marginLeft,
-        y
-    );
-    y += 8;
+
+    const paymentText = `Pagar por transferencia bancaria al siguiente número de cuenta: ${IBAN}`;
+    const payLines = doc.splitTextToSize(paymentText, CW) as string[];
+    doc.text(payLines, ML, y);
+    y += payLines.length * LINE_H + 4;
 
     // ══════════════════════════════════════════════════════
-    // 8. PUBLIC NOTES (optional)
+    // 7. PUBLIC NOTES (optional)
     // ══════════════════════════════════════════════════════
 
     if (data.publicNotes) {
-        checkPageBreak(20);
+        ensureSpace(20);
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...TEXT_MEDIUM);
-        doc.text("Observaciones:", marginLeft, y);
+        doc.text("Observaciones:", ML, y);
         y += 4.5;
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...TEXT_DARK);
-        const noteLines = doc.splitTextToSize(data.publicNotes, contentWidth);
-        doc.text(noteLines, marginLeft, y);
+        const noteLines = doc.splitTextToSize(data.publicNotes, CW) as string[];
+        doc.text(noteLines, ML, y);
         y += noteLines.length * 3.5 + 4;
     }
 
     // ══════════════════════════════════════════════════════
-    // 9. DRAW FOOTER ON ALL PAGES
+    // 8. DRAW FOOTER ON ALL PAGES
     // ══════════════════════════════════════════════════════
 
     const totalPages = doc.getNumberOfPages();
 
     for (let p = 1; p <= totalPages; p++) {
         doc.setPage(p);
-        const footerY = pageHeight - 12;
+        const footerY = PAGE_H - 12;
 
         doc.setDrawColor(...LINE_COLOR);
-        doc.line(marginLeft, footerY - 4, rightEdge, footerY - 4);
+        doc.line(ML, footerY - 4, RE, footerY - 4);
 
         doc.setFontSize(7);
         doc.setTextColor(...TEXT_LIGHT);
@@ -455,10 +493,10 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
         if (data.totalCents) footerParts.push(`${fmtCents(data.totalCents)}€`);
         if (data.dueDate) footerParts.push(`Vencimiento ${fmtDate(data.dueDate)}`);
         if (data.validUntil) footerParts.push(`Válido hasta ${fmtDate(data.validUntil)}`);
-        doc.text(footerParts.join(" - "), marginLeft, footerY);
+        doc.text(footerParts.join(" - "), ML, footerY);
 
         // Right: page X of Y
-        doc.text(`Pág. ${p} de ${totalPages}`, rightEdge, footerY, { align: "right" });
+        doc.text(`Pág. ${p} de ${totalPages}`, RE, footerY, { align: "right" });
     }
 
     // Convert to Buffer

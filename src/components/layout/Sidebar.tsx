@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useSidebar } from "./SidebarContext";
 
 const NAV_ITEMS = [
     {
@@ -45,6 +46,7 @@ const NAV_ITEMS = [
 export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
+    const { isOpen, close } = useSidebar();
 
     async function handleLogout() {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -53,52 +55,60 @@ export default function Sidebar() {
     }
 
     return (
-        <aside className="sidebar">
-            {/* Logo */}
-            <div className="sidebar-logo">
-                <img src="/logo.svg" alt="Automatio" className="sidebar-logo-img" />
-            </div>
+        <>
+            {/* Mobile overlay */}
+            {isOpen && (
+                <div className="sidebar-overlay" onClick={close} />
+            )}
 
-            {/* Navigation */}
-            <nav className="sidebar-nav">
-                {NAV_ITEMS.map((section) => (
-                    <div key={section.section}>
-                        <div className="sidebar-section-label">{section.section}</div>
-                        {section.items.map((item) => {
-                            const isActive =
-                                pathname === item.href ||
-                                (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`sidebar-link ${isActive ? "active" : ""}`}
-                                >
-                                    <span className="nav-icon">{item.icon}</span>
-                                    {item.label}
-                                </Link>
-                            );
-                        })}
-                    </div>
-                ))}
-            </nav>
-
-            {/* Footer */}
-            <div className="sidebar-footer">
-                <div className="sidebar-avatar">AD</div>
-                <div className="sidebar-user-info">
-                    <div className="sidebar-user-name">Administrador</div>
-                    <div className="sidebar-user-role">Admin</div>
+            <aside className={`sidebar ${isOpen ? "open" : ""}`}>
+                {/* Logo */}
+                <div className="sidebar-logo">
+                    <img src="/logo.svg" alt="Automatio" className="sidebar-logo-img" />
                 </div>
-                <button
-                    className="sidebar-logout-btn"
-                    onClick={handleLogout}
-                    title="Cerrar sesión"
-                >
-                    🚪
-                </button>
-            </div>
-        </aside>
+
+                {/* Navigation */}
+                <nav className="sidebar-nav">
+                    {NAV_ITEMS.map((section) => (
+                        <div key={section.section}>
+                            <div className="sidebar-section-label">{section.section}</div>
+                            {section.items.map((item) => {
+                                const isActive =
+                                    pathname === item.href ||
+                                    (item.href !== "/dashboard" && pathname.startsWith(item.href));
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={`sidebar-link ${isActive ? "active" : ""}`}
+                                        onClick={close}
+                                    >
+                                        <span className="nav-icon">{item.icon}</span>
+                                        {item.label}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </nav>
+
+                {/* Footer */}
+                <div className="sidebar-footer">
+                    <div className="sidebar-avatar">AD</div>
+                    <div className="sidebar-user-info">
+                        <div className="sidebar-user-name">Administrador</div>
+                        <div className="sidebar-user-role">Admin</div>
+                    </div>
+                    <button
+                        className="sidebar-logout-btn"
+                        onClick={handleLogout}
+                        title="Cerrar sesión"
+                    >
+                        🚪
+                    </button>
+                </div>
+            </aside>
+        </>
     );
 }
