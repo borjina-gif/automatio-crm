@@ -60,6 +60,18 @@ export async function sendDocumentEmail(
 }
 
 /**
+ * Send a simple notification email (no attachment).
+ */
+export async function sendNotificationEmail(
+    to: string,
+    subject: string,
+    htmlBody: string
+): Promise<void> {
+    const transporter = getTransporter();
+    await transporter.sendMail({ from: FROM, to, subject, html: htmlBody });
+}
+
+/**
  * Build HTML email body for a quote.
  */
 export function buildQuoteEmailBody(

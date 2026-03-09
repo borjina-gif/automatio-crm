@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Provider {
     id: string;
@@ -48,11 +49,11 @@ function fmtDate(d: string | null) {
 export default function ProviderDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showError, showConfirm } = useNotification();
     const [provider, setProvider] = useState<Provider | null>(null);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
     const [tab, setTab] = useState<"datos" | "historial">("datos");
     const [purchaseInvoices, setPurchaseInvoices] = useState<HistoryItem[]>([]);
     const [histLoading, setHistLoading] = useState(false);
@@ -66,7 +67,7 @@ export default function ProviderDetailPage() {
             const data = await res.json();
             setProvider(data);
         } catch {
-            setError("Proveedor no encontrado");
+            showError("Proveedor no encontrado");
         } finally {
             setLoading(false);
         }
@@ -89,7 +90,6 @@ export default function ProviderDetailPage() {
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
-        setError("");
 
         const form = new FormData(e.currentTarget);
         const data = Object.fromEntries(form.entries());
@@ -110,21 +110,21 @@ export default function ProviderDetailPage() {
             setProvider(updated);
             setEditing(false);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
     }
 
     async function handleDelete() {
-        if (!confirm("¿Estás seguro de que quieres eliminar este proveedor?")) return;
+        if (!await showConfirm("¿Estás seguro de que quieres eliminar este proveedor?")) return;
 
         try {
             const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Error al eliminar");
             router.push("/providers");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -174,11 +174,7 @@ export default function ProviderDetailPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
+
 
             {/* ── Tab Switcher ── */}
             <div className="detail-tabs" style={{ display: "flex", gap: 0, marginBottom: 20 }}>

@@ -1,6 +1,6 @@
 /* ===== Automatio CRM — Global Styles ===== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
     /* Color palette — Dark premium */
@@ -40,7 +40,7 @@
 
     /* Typography */
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --font-mono: 'Space Grotesk', 'Inter', sans-serif;
 
     /* Spacing */
     --sidebar-width: 260px;
@@ -515,6 +515,101 @@ textarea {
     color: var(--color-text);
 }
 
+/* ── Selection Checkbox ── */
+.data-table .cell-checkbox {
+    width: 40px;
+    padding: 0 0 0 12px !important;
+}
+
+.data-table .cell-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+    border-radius: 4px;
+}
+
+.data-table tr.row-selected td {
+    background: var(--color-primary-muted) !important;
+}
+
+/* ── Date Filter Bar ── */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-bar .filter-date-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 4px 10px;
+}
+
+.filter-bar .filter-date-group label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.filter-bar .filter-date-group input[type="date"] {
+    background: transparent;
+    border: none;
+    color: var(--color-text);
+    font-size: 13px;
+    padding: 4px 6px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-bar .filter-date-group input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+}
+
+/* ── Bulk Action Bar (floating) ── */
+.bulk-action-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 24px;
+    background: rgba(14, 15, 25, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    animation: bulk-bar-in 0.2s ease;
+}
+
+@keyframes bulk-bar-in {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.bulk-action-bar .bulk-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+.bulk-action-bar .bulk-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--color-border);
+}
+
 /* ===== Status Badges ===== */
 .badge {
     display: inline-flex;
@@ -793,6 +888,81 @@ textarea {
     color: var(--color-danger);
 }
 
+/* ── Service Autocomplete ── */
+.sac-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.sac-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    max-height: 220px;
+    overflow-y: auto;
+    animation: sac-fade-in 0.15s ease;
+}
+
+@keyframes sac-fade-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.sac-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.sac-item:last-child {
+    border-bottom: none;
+}
+
+.sac-item-active {
+    background: var(--color-primary-muted);
+}
+
+.sac-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.sac-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+}
+
+.sac-item-tax {
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    background: var(--color-primary-muted);
+    color: var(--color-primary);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.sac-empty {
+    padding: 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
 .lines-footer {
     display: flex;
     justify-content: space-between;
@@ -832,24 +1002,155 @@ textarea {
     font-family: var(--font-mono);
 }
 
-/* ===== Toast (basic) ===== */
-.toast-container {
+/* ===== Notification Modal ===== */
+.notif-modal-overlay {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 999;
+    inset: 0;
+    z-index: 9999;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    animation: notif-overlay-in 0.2s ease forwards;
+    padding: 20px;
 }
 
+.notif-modal-overlay.notif-modal-closing {
+    animation: notif-overlay-out 0.2s ease forwards;
+}
+
+@keyframes notif-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes notif-overlay-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.notif-modal {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 32px 28px 24px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.06);
+    animation: notif-slide-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.notif-modal.notif-modal-slide-out {
+    animation: notif-slide-out 0.2s ease forwards;
+}
+
+@keyframes notif-slide-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes notif-slide-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+
+.notif-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.notif-modal-close:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+/* Icon container */
+.notif-modal-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.notif-modal-icon-svg {
+    width: 28px;
+    height: 28px;
+}
+
+.notif-modal-icon-success {
+    background: var(--color-success-muted);
+    color: var(--color-success);
+}
+
+.notif-modal-icon-error {
+    background: var(--color-danger-muted);
+    color: var(--color-danger);
+}
+
+.notif-modal-icon-info {
+    background: var(--color-info-muted);
+    color: var(--color-info);
+}
+
+.notif-modal-icon-confirm {
+    background: var(--color-warning-muted);
+    color: var(--color-warning);
+}
+
+.notif-modal-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 8px;
+}
+
+.notif-modal-message {
+    font-size: 13.5px;
+    color: var(--color-text-secondary);
+    line-height: 1.55;
+    margin-bottom: 24px;
+    max-width: 340px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.notif-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.notif-modal-actions .btn {
+    min-width: 100px;
+}
+
+/* Legacy toast support (inline error/success banners) */
 .toast {
     padding: 12px 18px;
     border-radius: var(--radius-md);
     font-size: 13px;
     font-weight: 500;
     box-shadow: var(--shadow-lg);
-    animation: toast-in 0.3s ease forwards;
 }
 
 .toast-success {
@@ -860,18 +1161,6 @@ textarea {
 .toast-error {
     background: var(--color-danger);
     color: white;
-}
-
-@keyframes toast-in {
-    from {
-        opacity: 0;
-        transform: translateX(40px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
 }
 
 /* ===== Loading ===== */

@@ -65,23 +65,23 @@ export default function CompanySettingsPage() {
         }
     };
 
-    if (loading) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    if (loading) return <p style={{ color: "var(--color-text-secondary)" }}>Cargando…</p>;
     if (!company) return <p>No se encontró empresa</p>;
 
     const fieldStyle: React.CSSProperties = {
         width: "100%",
         padding: "10px 14px",
         borderRadius: 8,
-        border: "1px solid var(--border-color, #e5e7eb)",
+        border: "1px solid var(--color-border)",
         fontSize: 14,
-        background: "var(--bg-input, #fff)",
-        color: "var(--text-primary, #333)",
+        background: "var(--color-surface)",
+        color: "var(--color-text)",
     };
 
     const labelStyle: React.CSSProperties = {
         fontSize: 13,
         fontWeight: 600,
-        color: "var(--text-secondary, #666)",
+        color: "var(--color-text-secondary)",
         marginBottom: 4,
         display: "block",
     };

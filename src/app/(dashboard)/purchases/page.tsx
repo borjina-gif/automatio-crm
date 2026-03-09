@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useNotification } from "@/components/NotificationContext";
 
 interface PurchaseInvoice {
     id: string;
@@ -51,12 +52,19 @@ export default function PurchasesPage() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("");
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    const { showConfirm } = useNotification();
+
+    const now = new Date();
+    const [dateFrom, setDateFrom] = useState(`${now.getFullYear()}-01-01`);
+    const [dateTo, setDateTo] = useState(`${now.getFullYear()}-12-31`);
 
     useEffect(() => {
         fetchPurchases();
-    }, [statusFilter]);
+        setSelected(new Set());
+    }, [statusFilter, dateFrom, dateTo]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -71,19 +79,31 @@ export default function PurchasesPage() {
     async function fetchPurchases() {
         setLoading(true);
         try {
-            const url = statusFilter ? `/api/purchases?status=${statusFilter}` : "/api/purchases";
-            const res = await fetch(url);
+            const params = new URLSearchParams();
+            if (statusFilter) params.set("status", statusFilter);
+            if (dateFrom) params.set("from", dateFrom);
+            if (dateTo) params.set("to", dateTo);
+            const res = await fetch(`/api/purchases?${params}`);
             const data = await res.json();
             setPurchases(Array.isArray(data) ? data : []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { console.error(err); } finally { setLoading(false); }
     }
 
+    const toggleSelect = (id: string) => {
+        setSelected((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAll = () => {
+        if (selected.size === purchases.length) setSelected(new Set());
+        else setSelected(new Set(purchases.map((p) => p.id)));
+    };
+
     async function handleBook(id: string) {
-        if (!confirm("¿Contabilizar esta factura de proveedor? Se asignará un número.")) return;
+        if (!await showConfirm("¿Contabilizar esta factura de proveedor? Se asignará un número.")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, {
                 method: "PUT",
@@ -96,7 +116,7 @@ export default function PurchasesPage() {
     }
 
     async function handlePay(id: string) {
-        if (!confirm("¿Marcar como pagada?")) return;
+        if (!await showConfirm("¿Marcar como pagada?")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, {
                 method: "PUT",
@@ -124,7 +144,7 @@ export default function PurchasesPage() {
     }
 
     async function handleDelete(id: string) {
-        if (!confirm("¿Eliminar esta factura de proveedor?")) return;
+        if (!await showConfirm("¿Eliminar esta factura de proveedor?")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
             if (res.ok) fetchPurchases();
@@ -144,38 +164,42 @@ export default function PurchasesPage() {
                 </Link>
             </div>
 
-            {/* Status filters */}
-            <div className="status-filters" style={{ marginBottom: 20, display: "flex", gap: 8 }}>
+            {/* Filters */}
+            <div className="filter-bar">
                 {STATUS_FILTERS.map((f) => (
-                    <button
-                        key={f.value}
-                        className={`btn btn-sm ${statusFilter === f.value ? "btn-primary" : "btn-ghost"}`}
-                        onClick={() => setStatusFilter(f.value)}
-                    >
+                    <button key={f.value} className={`btn btn-sm ${statusFilter === f.value ? "btn-primary" : "btn-secondary"}`} onClick={() => setStatusFilter(f.value)}>
                         {f.label}
                     </button>
                 ))}
+                <div style={{ flex: 1 }} />
+                <div className="filter-date-group">
+                    <label>📅 Desde</label>
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                </div>
+                <div className="filter-date-group">
+                    <label>Hasta</label>
+                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                </div>
             </div>
 
             {/* Table */}
             <div className="table-container">
                 {loading ? (
-                    <div className="loading-center">
-                        <div className="spinner" />
-                    </div>
+                    <div className="loading-center"><div className="spinner" /></div>
                 ) : purchases.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state-icon">📦</div>
                         <h3>No hay facturas de proveedor</h3>
                         <p>Registra tu primera factura de proveedor</p>
-                        <Link href="/purchases/new" className="btn btn-primary">
-                            + Nueva Factura Proveedor
-                        </Link>
+                        <Link href="/purchases/new" className="btn btn-primary">+ Nueva Factura Proveedor</Link>
                     </div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
+                                <th className="cell-checkbox">
+                                    <input type="checkbox" checked={selected.size === purchases.length && purchases.length > 0} onChange={toggleAll} />
+                                </th>
                                 <th>Número</th>
                                 <th>Proveedor</th>
                                 <th>Nº Proveedor</th>
@@ -188,48 +212,27 @@ export default function PurchasesPage() {
                         <tbody>
                             {purchases.map((p) => {
                                 const st = STATUS_LABELS[p.status] || { label: p.status, class: "badge-draft" };
+                                const isSelected = selected.has(p.id);
                                 return (
-                                    <tr
-                                        key={p.id}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={() => router.push(`/purchases/${p.id}`)}
-                                    >
+                                    <tr key={p.id} className={isSelected ? "row-selected" : ""} style={{ cursor: "pointer" }} onClick={() => router.push(`/purchases/${p.id}`)}>
+                                        <td className="cell-checkbox" onClick={(e) => e.stopPropagation()}>
+                                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(p.id)} />
+                                        </td>
                                         <td className="cell-mono">{docNumber(p)}</td>
                                         <td className="cell-primary">{p.provider?.name || "—"}</td>
                                         <td className="cell-mono">{p.providerInvoiceNumber || "—"}</td>
                                         <td>{fmtDate(p.issueDate)}</td>
                                         <td className="cell-mono">{fmtCents(p.totalCents)}</td>
-                                        <td>
-                                            <span className={`badge ${st.class}`}>{st.label}</span>
-                                        </td>
+                                        <td><span className={`badge ${st.class}`}>{st.label}</span></td>
                                         <td className="text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="dropdown-container" ref={openDropdown === p.id ? dropdownRef : null}>
-                                                <button
-                                                    className="btn btn-ghost btn-sm"
-                                                    onClick={() => setOpenDropdown(openDropdown === p.id ? null : p.id)}
-                                                >
-                                                    ⋯
-                                                </button>
+                                                <button className="btn btn-ghost btn-sm" onClick={() => setOpenDropdown(openDropdown === p.id ? null : p.id)}>⋯</button>
                                                 {openDropdown === p.id && (
                                                     <div className="dropdown-menu show">
-                                                        <button className="dropdown-item" onClick={() => handleDownloadPDF(p.id)}>
-                                                            📄 Descargar PDF
-                                                        </button>
-                                                        {p.status === "DRAFT" && (
-                                                            <button className="dropdown-item" onClick={() => handleBook(p.id)}>
-                                                                ✅ Contabilizar
-                                                            </button>
-                                                        )}
-                                                        {p.status === "BOOKED" && (
-                                                            <button className="dropdown-item" onClick={() => handlePay(p.id)}>
-                                                                💰 Marcar Pagada
-                                                            </button>
-                                                        )}
-                                                        {p.status === "DRAFT" && (
-                                                            <button className="dropdown-item text-danger" onClick={() => handleDelete(p.id)}>
-                                                                🗑️ Eliminar
-                                                            </button>
-                                                        )}
+                                                        <button className="dropdown-item" onClick={() => handleDownloadPDF(p.id)}>📄 Descargar PDF</button>
+                                                        {p.status === "DRAFT" && <button className="dropdown-item" onClick={() => handleBook(p.id)}>✅ Contabilizar</button>}
+                                                        {p.status === "BOOKED" && <button className="dropdown-item" onClick={() => handlePay(p.id)}>💰 Marcar Pagada</button>}
+                                                        {p.status === "DRAFT" && <button className="dropdown-item text-danger" onClick={() => handleDelete(p.id)}>🗑️ Eliminar</button>}
                                                     </div>
                                                 )}
                                             </div>
@@ -241,6 +244,15 @@ export default function PurchasesPage() {
                     </table>
                 )}
             </div>
+
+            {/* Bulk Action Bar */}
+            {selected.size > 0 && (
+                <div className="bulk-action-bar">
+                    <span className="bulk-count">{selected.size} seleccionada{selected.size !== 1 ? "s" : ""}</span>
+                    <div className="bulk-divider" />
+                    <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set())}>✕ Deseleccionar</button>
+                </div>
+            )}
         </>
     );
 }

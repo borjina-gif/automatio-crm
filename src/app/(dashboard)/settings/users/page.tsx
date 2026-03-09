@@ -40,9 +40,9 @@ export default function UsersSettingsPage() {
         if (res.ok) { setShowResetModal(null); setResetPassword(""); setMessage("✅ Contraseña reseteada"); } else { const d = await res.json(); setMessage(`❌ ${d.error}`); }
     };
 
-    if (loading) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    if (loading) return <p style={{ color: "var(--color-text-secondary)" }}>Cargando…</p>;
 
-    const f: React.CSSProperties = { width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border-color, #e5e7eb)", fontSize: 14, background: "var(--bg-input, #fff)" };
+    const f: React.CSSProperties = { width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--color-border)", fontSize: 14, background: "var(--color-surface)", color: "var(--color-text)" };
     const btn: React.CSSProperties = { padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border-color)", background: "transparent", cursor: "pointer", fontSize: 12, marginRight: 6 };
 
     return (
@@ -53,16 +53,16 @@ export default function UsersSettingsPage() {
             </div>
 
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ borderBottom: "2px solid var(--border-color, #e5e7eb)" }}>
-                    {["Nombre", "Email", "Rol", "Estado", "Último login", "Acciones"].map(h => <th key={h} style={{ textAlign: h === "Acciones" ? "right" : "left", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>{h}</th>)}
+                <thead><tr style={{ borderBottom: "2px solid var(--color-border)" }}>
+                    {["Nombre", "Email", "Rol", "Estado", "Último login", "Acciones"].map(h => <th key={h} style={{ textAlign: h === "Acciones" ? "right" : "left", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>{h}</th>)}
                 </tr></thead>
                 <tbody>{users.map(u => (
-                    <tr key={u.id} style={{ borderBottom: "1px solid var(--border-color, #e5e7eb)", opacity: u.isActive ? 1 : 0.5 }}>
+                    <tr key={u.id} style={{ borderBottom: "1px solid var(--color-border)", opacity: u.isActive ? 1 : 0.5 }}>
                         <td style={{ padding: 12, fontWeight: 600 }}>{u.name || "—"}</td>
                         <td style={{ padding: 12 }}>{u.email}</td>
                         <td style={{ padding: 12 }}><span style={{ padding: "2px 10px", borderRadius: 4, fontSize: 12, fontWeight: 600, background: u.role === "ADMIN" ? "#dbeafe" : "#e5e7eb", color: u.role === "ADMIN" ? "#1d4ed8" : "#374151" }}>{u.role}</span></td>
                         <td style={{ padding: 12 }}>{u.isActive ? "🟢 Activo" : "🔴 Inactivo"}</td>
-                        <td style={{ padding: 12, fontSize: 13, color: "var(--text-secondary)" }}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("es-ES") : "Nunca"}</td>
+                        <td style={{ padding: 12, fontSize: 13, color: "var(--color-text-secondary)" }}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("es-ES") : "Nunca"}</td>
                         <td style={{ padding: 12, textAlign: "right" }}>
                             <button onClick={() => toggleActive(u)} style={btn}>{u.isActive ? "Desactivar" : "Activar"}</button>
                             <button onClick={() => { setShowResetModal(u.id); setResetPassword(""); }} style={{ ...btn, borderColor: "#f59e0b", color: "#f59e0b" }}>Reset pass</button>
@@ -74,7 +74,7 @@ export default function UsersSettingsPage() {
 
             {showModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-                    <div style={{ background: "var(--bg-card, #fff)", borderRadius: 12, padding: 24, width: 420 }}>
+                    <div style={{ background: "var(--color-surface)", borderRadius: 12, padding: 24, width: 420, color: "var(--color-text)" }}>
                         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Nuevo usuario</h3>
                         {[{ l: "Nombre", k: "name", t: "text" }, { l: "Email *", k: "email", t: "email" }, { l: "Contraseña *", k: "password", t: "password" }].map(({ l, k, t }) => (
                             <div key={k} style={{ marginBottom: 12 }}>
@@ -98,7 +98,7 @@ export default function UsersSettingsPage() {
 
             {showResetModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-                    <div style={{ background: "var(--bg-card, #fff)", borderRadius: 12, padding: 24, width: 380 }}>
+                    <div style={{ background: "var(--color-surface)", borderRadius: 12, padding: 24, width: 380, color: "var(--color-text)" }}>
                         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Resetear contraseña</h3>
                         <div style={{ marginBottom: 16 }}>
                             <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 4 }}>Nueva contraseña</label>

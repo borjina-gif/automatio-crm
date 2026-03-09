@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Tax {
     id: string;
@@ -94,9 +95,8 @@ export default function RecurringInvoicesPage() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
     const [runningId, setRunningId] = useState("");
+    const { showSuccess, showError, showConfirm } = useNotification();
 
     // Form state
     const [formName, setFormName] = useState("");
@@ -140,7 +140,7 @@ export default function RecurringInvoicesPage() {
                 );
             }
         } catch {
-            setError("Error cargando datos");
+            showError("Error cargando datos");
         } finally {
             setLoading(false);
         }
@@ -165,12 +165,11 @@ export default function RecurringInvoicesPage() {
     };
 
     async function handleCreate() {
-        if (!formClientId) { setError("Selecciona un cliente"); return; }
-        if (!formName) { setError("Escribe un nombre para la plantilla"); return; }
-        if (formLines.every((l) => !l.description)) { setError("Añade al menos una línea"); return; }
+        if (!formClientId) { showError("Selecciona un cliente"); return; }
+        if (!formName) { showError("Escribe un nombre para la plantilla"); return; }
+        if (formLines.every((l) => !l.description)) { showError("Añade al menos una línea"); return; }
 
         setSaving(true);
-        setError("");
 
         const apiLines = formLines
             .filter((l) => l.description)
@@ -201,13 +200,12 @@ export default function RecurringInvoicesPage() {
                 throw new Error(err.error || "Error al crear plantilla");
             }
 
-            setSuccess("✅ Plantilla creada correctamente");
-            setTimeout(() => setSuccess(""), 3000);
+            showSuccess("Plantilla creada correctamente");
             setShowForm(false);
             resetForm();
             fetchAll();
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -233,39 +231,37 @@ export default function RecurringInvoicesPage() {
             });
             fetchAll();
         } catch {
-            setError("Error al cambiar estado");
+            showError("Error al cambiar estado");
         }
     }
 
     async function handleRunNow(templateId: string) {
-        if (!confirm("¿Ejecutar ahora esta plantilla? Se generará una factura.")) return;
+        if (!await showConfirm("¿Ejecutar ahora esta plantilla? Se generará una factura.")) return;
         setRunningId(templateId);
-        setError("");
         try {
             const res = await fetch(`/api/recurring-templates/${templateId}/run`, {
                 method: "POST",
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Error al ejecutar");
-            setSuccess(`✅ Factura generada correctamente`);
-            setTimeout(() => setSuccess(""), 4000);
+            showSuccess("Factura generada correctamente");
             fetchAll();
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setRunningId("");
         }
     }
 
     async function handleDelete(templateId: string) {
-        if (!confirm("¿Eliminar esta plantilla recurrente?")) return;
+        if (!await showConfirm("¿Eliminar esta plantilla recurrente?")) return;
         try {
             await fetch(`/api/recurring-templates/${templateId}`, {
                 method: "DELETE",
             });
             fetchAll();
         } catch {
-            setError("Error al eliminar");
+            showError("Error al eliminar");
         }
     }
 
@@ -280,7 +276,7 @@ export default function RecurringInvoicesPage() {
             setExpandedRuns(data.runs || []);
             setExpandedId(templateId);
         } catch {
-            setError("Error al cargar historial");
+            showError("Error al cargar historial");
         }
     }
 
@@ -309,17 +305,7 @@ export default function RecurringInvoicesPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                    <button onClick={() => setError("")} style={{ marginLeft: 8, background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button>
-                </div>
-            )}
-            {success && (
-                <div className="toast toast-success" style={{ position: "static", marginBottom: 16 }}>
-                    {success}
-                </div>
-            )}
+
 
             {/* Create form */}
             {showForm && (

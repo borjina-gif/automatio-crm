@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 export default function NewClientPage() {
     const router = useRouter();
+    const { showError } = useNotification();
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
-        setError("");
 
         const form = new FormData(e.currentTarget);
         const data = Object.fromEntries(form.entries());
@@ -32,7 +32,7 @@ export default function NewClientPage() {
             const client = await res.json();
             router.push(`/clients/${client.id}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -52,11 +52,7 @@ export default function NewClientPage() {
 
             <div className="card">
                 <div className="card-body">
-                    {error && (
-                        <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                            {error}
-                        </div>
-                    )}
+
 
                     <form onSubmit={handleSubmit}>
                         <div className="form-row">

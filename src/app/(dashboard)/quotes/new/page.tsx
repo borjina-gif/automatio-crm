@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
+import ServiceAutocomplete from "@/components/ServiceAutocomplete";
 
 interface Tax {
     id: string;
@@ -53,6 +55,7 @@ function formatCents(cents: number): string {
 
 export default function NewQuotePage() {
     const router = useRouter();
+    const { showError } = useNotification();
     const [clients, setClients] = useState<Client[]>([]);
     const [taxes, setTaxes] = useState<Tax[]>([]);
     const [clientId, setClientId] = useState("");
@@ -61,7 +64,6 @@ export default function NewQuotePage() {
     const [validUntil, setValidUntil] = useState("");
     const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
 
     useEffect(() => {
         Promise.all([
@@ -120,16 +122,15 @@ export default function NewQuotePage() {
 
     async function handleSave() {
         if (!clientId) {
-            setError("Selecciona un cliente");
+            showError("Selecciona un cliente");
             return;
         }
         if (lines.length === 0 || lines.every((l) => !l.description)) {
-            setError("Añade al menos una línea con descripción");
+            showError("Añade al menos una línea con descripción");
             return;
         }
 
         setSaving(true);
-        setError("");
 
         const apiLines = lines
             .filter((l) => l.description)
@@ -165,7 +166,7 @@ export default function NewQuotePage() {
             const quote = await res.json();
             router.push(`/quotes/${quote.id}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -183,11 +184,7 @@ export default function NewQuotePage() {
                 </Link>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
+
 
             {/* Header fields */}
             <div className="card" style={{ marginBottom: 20 }}>
@@ -250,11 +247,18 @@ export default function NewQuotePage() {
                             const c = calcLine(line);
                             return (
                                 <div className="line-row" key={line.key}>
-                                    <input
-                                        className="line-input"
-                                        placeholder="Descripción del concepto..."
+                                    <ServiceAutocomplete
                                         value={line.description}
-                                        onChange={(e) => updateLine(line.key, "description", e.target.value)}
+                                        onChange={(val) => updateLine(line.key, "description", val)}
+                                        onServiceSelect={(svc) => {
+                                            setLines((prev) =>
+                                                prev.map((l) =>
+                                                    l.key === line.key
+                                                        ? { ...l, description: svc.description, unitPriceEuros: svc.unitPriceEuros, taxId: svc.taxId, taxRate: svc.taxRate }
+                                                        : l
+                                                )
+                                            );
+                                        }}
                                     />
                                     <input
                                         className="line-input"

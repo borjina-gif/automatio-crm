@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Counter {
     docType: string;
@@ -21,7 +22,7 @@ const DOC_LABELS: Record<string, string> = {
 export default function BillingSettingsPage() {
     const [counters, setCounters] = useState<Counter[]>([]);
     const [loading, setLoading] = useState(true);
-    const [message, setMessage] = useState("");
+    const { showSuccess, showError, showConfirm } = useNotification();
 
     const fetchCounters = useCallback(async () => {
         try {
@@ -29,7 +30,7 @@ export default function BillingSettingsPage() {
             const data = await res.json();
             setCounters(data);
         } catch {
-            setMessage("Error al cargar numeración");
+            showError("Error al cargar numeración");
         } finally {
             setLoading(false);
         }
@@ -38,7 +39,7 @@ export default function BillingSettingsPage() {
     useEffect(() => { fetchCounters(); }, [fetchCounters]);
 
     const handleReset = async (docType: string) => {
-        if (!confirm(`¿Estás seguro de resetear el contador de ${DOC_LABELS[docType] || docType}?`)) return;
+        if (!await showConfirm(`¿Estás seguro de resetear el contador de ${DOC_LABELS[docType] || docType}?`)) return;
         try {
             const res = await fetch("/api/settings/numbering", {
                 method: "PATCH",
@@ -46,21 +47,21 @@ export default function BillingSettingsPage() {
                 body: JSON.stringify({ docType, resetTo: 0 }),
             });
             if (res.ok) {
-                setMessage(`✅ Contador de ${DOC_LABELS[docType]} reseteado`);
+                showSuccess(`Contador de ${DOC_LABELS[docType]} reseteado`);
                 fetchCounters();
             } else {
-                setMessage("❌ Error al resetear");
+                showError("Error al resetear");
             }
         } catch {
-            setMessage("❌ Error de conexión");
+            showError("Error de conexión");
         }
     };
 
-    if (loading) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    if (loading) return <p style={{ color: "var(--color-text-secondary)" }}>Cargando…</p>;
 
     const cardStyle: React.CSSProperties = {
-        background: "var(--bg-card, #fff)",
-        border: "1px solid var(--border-color, #e5e7eb)",
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
         borderRadius: 12,
         padding: 20,
         marginBottom: 16,
@@ -69,7 +70,7 @@ export default function BillingSettingsPage() {
     return (
         <div style={{ maxWidth: 720 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Numeración y Facturación</h2>
-            <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 24 }}>
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24 }}>
                 Series de numeración con reinicio anual automático. Facturas: F{'{'}YY{'}'}/{'{'}NN{'}'} · Presupuestos: PRE-AÑO-NÚMERO
             </p>
 
@@ -80,7 +81,7 @@ export default function BillingSettingsPage() {
                             <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
                                 {DOC_LABELS[c.docType] || c.docType}
                             </h3>
-                            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
+                            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 8 }}>
                                 Prefijo: <strong>{c.prefix}</strong> · Año: <strong>{c.year}</strong> · Padding: 4 dígitos
                             </p>
                         </div>
@@ -103,12 +104,12 @@ export default function BillingSettingsPage() {
 
                     <div style={{ display: "flex", gap: 32, marginTop: 12 }}>
                         <div>
-                            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Número actual</span>
-                            <p style={{ fontSize: 22, fontWeight: 700, fontFamily: "monospace" }}>{c.currentNumber}</p>
+                            <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Número actual</span>
+                            <p style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{c.currentNumber}</p>
                         </div>
                         <div>
-                            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Siguiente número</span>
-                            <p style={{ fontSize: 22, fontWeight: 700, fontFamily: "monospace", color: "var(--color-primary, #1B1660)" }}>
+                            <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Siguiente número</span>
+                            <p style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-primary)" }}>
                                 {c.nextFormatted}
                             </p>
                         </div>
@@ -116,7 +117,7 @@ export default function BillingSettingsPage() {
                 </div>
             ))}
 
-            {message && <p style={{ fontSize: 14, marginTop: 12 }}>{message}</p>}
+
         </div>
     );
 }

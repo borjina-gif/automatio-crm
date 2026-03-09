@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Provider {
     id: string;
@@ -95,6 +96,7 @@ function LineItemEditor({
 
 export default function NewPurchasePage() {
     const router = useRouter();
+    const { showError } = useNotification();
     const [providers, setProviders] = useState<Provider[]>([]);
     const [taxes, setTaxes] = useState<Tax[]>([]);
     const [providerId, setProviderId] = useState("");
@@ -104,7 +106,6 @@ export default function NewPurchasePage() {
     const [notes, setNotes] = useState("");
     const [lines, setLines] = useState<LineItem[]>([newLine()]);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
 
     useEffect(() => {
         fetch("/api/providers").then((r) => r.json()).then((d) => setProviders(Array.isArray(d) ? d : []));
@@ -147,16 +148,15 @@ export default function NewPurchasePage() {
 
     async function handleSave() {
         if (!providerId) {
-            setError("Selecciona un proveedor");
+            showError("Selecciona un proveedor");
             return;
         }
         if (lines.length === 0 || !lines.some((l) => l.description.trim())) {
-            setError("Añade al menos una línea con descripción");
+            showError("Añade al menos una línea con descripción");
             return;
         }
 
         setSaving(true);
-        setError("");
 
         try {
             const res = await fetch("/api/purchases", {
@@ -186,7 +186,7 @@ export default function NewPurchasePage() {
             const purchase = await res.json();
             router.push(`/purchases/${purchase.id}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -204,11 +204,7 @@ export default function NewPurchasePage() {
                 </Link>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
+
 
             <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-body">

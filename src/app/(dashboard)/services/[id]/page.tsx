@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Tax {
     id: string;
@@ -23,11 +24,11 @@ interface ServiceDetail {
 export default function ServiceDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showError } = useNotification();
     const [service, setService] = useState<ServiceDetail | null>(null);
     const [taxes, setTaxes] = useState<Tax[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
     const [priceEuros, setPriceEuros] = useState("");
 
     useEffect(() => {
@@ -40,7 +41,7 @@ export default function ServiceDetailPage() {
             setPriceEuros((svc.unitPriceCents / 100).toFixed(2));
             setLoading(false);
         }).catch(() => {
-            setError("Servicio no encontrado");
+            showError("Servicio no encontrado");
             setLoading(false);
         });
     }, [id]);
@@ -48,7 +49,6 @@ export default function ServiceDetailPage() {
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
-        setError("");
 
         const form = new FormData(e.currentTarget);
         const name = form.get("name") as string;
@@ -78,7 +78,7 @@ export default function ServiceDetailPage() {
             setService(updated);
             router.push("/services");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -118,11 +118,7 @@ export default function ServiceDetailPage() {
 
             <div className="card">
                 <div className="card-body">
-                    {error && (
-                        <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                            {error}
-                        </div>
-                    )}
+
                     <form onSubmit={handleSubmit}>
                         <div className="form-row">
                             <div className="form-group">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 function formatCents(cents: number): string {
     return (cents / 100).toLocaleString("es-ES", {
@@ -22,11 +23,10 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
 export default function InvoiceDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showSuccess, showError, showConfirm } = useNotification();
     const [invoice, setInvoice] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState("");
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
     const [documents, setDocuments] = useState<any[]>([]);
     const [uploading, setUploading] = useState(false);
 
@@ -48,18 +48,16 @@ export default function InvoiceDetailPage() {
     // ── ACTION HANDLERS ─────────────────────────────────
 
     async function handleEmit() {
-        if (!confirm("¿Emitir factura? Se asignará número definitivo.")) return;
+        if (!await showConfirm("¿Emitir factura? Se asignará número definitivo.")) return;
         setActionLoading("emit");
-        setError("");
         try {
             const res = await fetch(`/api/invoices/${id}/emit`, { method: "POST" });
             if (!res.ok) throw new Error((await res.json()).error);
             const updated = await res.json();
             setInvoice(updated);
-            setSuccess("✅ Factura emitida correctamente");
-            setTimeout(() => setSuccess(""), 4000);
+            showSuccess("Factura emitida correctamente");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
@@ -80,37 +78,35 @@ export default function InvoiceDetailPage() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
     }
 
     async function handleSendEmail() {
-        if (!confirm("¿Enviar factura por email al cliente?")) return;
+        if (!await showConfirm("¿Enviar factura por email al cliente?")) return;
         setActionLoading("send");
-        setError("");
         try {
             const res = await fetch(`/api/invoices/${id}/send`, { method: "POST" });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            setSuccess(`📧 Enviado a ${data.sentTo}`);
-            setTimeout(() => setSuccess(""), 5000);
+            showSuccess(`Enviado a ${data.sentTo}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
     }
 
     async function handleDelete() {
-        if (!confirm("¿Eliminar esta factura?")) return;
+        if (!await showConfirm("¿Eliminar esta factura?")) return;
         try {
             const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Error al eliminar");
             router.push("/invoices");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -183,16 +179,7 @@ export default function InvoiceDetailPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
-            {success && (
-                <div className="toast toast-success" style={{ position: "static", marginBottom: 16 }}>
-                    {success}
-                </div>
-            )}
+
 
             {/* Invoice info */}
             <div className="card" style={{ marginBottom: 20 }}>
@@ -304,7 +291,6 @@ export default function InvoiceDetailPage() {
                                     const file = e.target.files?.[0];
                                     if (!file) return;
                                     setUploading(true);
-                                    setError("");
                                     try {
                                         const fd = new FormData();
                                         fd.append("file", file);
@@ -317,10 +303,9 @@ export default function InvoiceDetailPage() {
                                         if (!res.ok) throw new Error((await res.json()).error);
                                         const doc = await res.json();
                                         setDocuments((prev) => [doc, ...prev]);
-                                        setSuccess("✅ Archivo subido");
-                                        setTimeout(() => setSuccess(""), 3000);
+                                        showSuccess("Archivo subido");
                                     } catch (err: any) {
-                                        setError(err.message || "Error al subir archivo");
+                                        showError(err.message || "Error al subir archivo");
                                     } finally {
                                         setUploading(false);
                                         e.target.value = "";
@@ -363,7 +348,7 @@ export default function InvoiceDetailPage() {
                                                 className="btn btn-danger btn-sm"
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    if (!confirm("¿Eliminar este adjunto?")) return;
+                                                    if (!await showConfirm("¿Eliminar este adjunto?")) return;
                                                     try {
                                                         const res = await fetch(`/api/documents/${doc.id}/download`, {
                                                             method: "DELETE",
@@ -371,7 +356,7 @@ export default function InvoiceDetailPage() {
                                                         if (!res.ok) throw new Error("Error");
                                                         setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
                                                     } catch {
-                                                        setError("Error al eliminar adjunto");
+                                                        showError("Error al eliminar adjunto");
                                                     }
                                                 }}
                                             >

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getNextNumber } from "@/lib/numbering";
 import { generateInvoicePDF } from "@/lib/pdf";
-import { sendDocumentEmail, buildInvoiceEmailBody } from "@/lib/email";
+import { sendDocumentEmail, buildInvoiceEmailBody, sendNotificationEmail } from "@/lib/email";
 import { logActivity } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -207,6 +207,57 @@ export async function POST(request: Request) {
                     status: "FAILED",
                     error: templateErr.message,
                 });
+            }
+        }
+
+        // Send summary notification email to company
+        if (company.email && results.length > 0) {
+            const successCount = results.filter(r => r.status === "SUCCESS").length;
+            const failedCount = results.filter(r => r.status === "FAILED").length;
+            const skippedCount = results.filter(r => r.status === "SKIPPED").length;
+
+            const rows = results.map(r => {
+                const statusIcon = r.status === "SUCCESS" ? "✅" : r.status === "SKIPPED" ? "⏭️" : "❌";
+                const errorLine = r.error ? `<br><small style="color:#ef4444">${r.error}</small>` : "";
+                return `<tr>
+                    <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${r.name}</td>
+                    <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${statusIcon} ${r.status}${errorLine}</td>
+                </tr>`;
+            }).join("");
+
+            const htmlBody = `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+                <div style="background:#1e1e32;padding:20px;border-radius:8px 8px 0 0">
+                    <h1 style="color:#fff;margin:0;font-size:20px">Facturas Recurrentes — Resumen</h1>
+                    <p style="color:#a0a0c0;margin:4px 0 0">${now.toLocaleDateString("es-ES", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
+                </div>
+                <div style="padding:24px;background:#f8f9fa;border:1px solid #e0e0e0">
+                    <p>Se han procesado <strong>${results.length}</strong> plantillas recurrentes:</p>
+                    <ul style="margin:8px 0 16px">
+                        ${successCount > 0 ? `<li>✅ <strong>${successCount}</strong> generadas correctamente</li>` : ""}
+                        ${failedCount > 0 ? `<li>❌ <strong>${failedCount}</strong> con errores</li>` : ""}
+                        ${skippedCount > 0 ? `<li>⏭️ <strong>${skippedCount}</strong> omitidas (ya ejecutadas)</li>` : ""}
+                    </ul>
+                    <table style="width:100%;border-collapse:collapse;font-size:14px">
+                        <thead><tr style="background:#eee">
+                            <th style="padding:8px 12px;text-align:left">Plantilla</th>
+                            <th style="padding:8px 12px;text-align:left">Estado</th>
+                        </tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <br>
+                    <p style="color:#888;font-size:12px">Automatio solutions S.L · info@automatio.es</p>
+                </div>
+            </div>`;
+
+            try {
+                await sendNotificationEmail(
+                    company.email,
+                    `Facturas recurrentes: ${successCount} generadas — ${now.toLocaleDateString("es-ES")}`,
+                    htmlBody
+                );
+            } catch (emailErr) {
+                console.error("Error sending recurring summary email:", emailErr);
             }
         }
 

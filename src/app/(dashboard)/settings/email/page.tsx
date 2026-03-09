@@ -32,9 +32,10 @@ export default function EmailSettingsPage() {
         width: "100%",
         padding: "10px 14px",
         borderRadius: 8,
-        border: "1px solid var(--border-color, #e5e7eb)",
+        border: "1px solid var(--color-border)",
         fontSize: 14,
-        background: "var(--bg-input, #fff)",
+        background: "var(--color-surface)",
+        color: "var(--color-text)",
     };
 
     return (
@@ -43,8 +44,8 @@ export default function EmailSettingsPage() {
 
             {/* Status card */}
             <div style={{
-                background: "var(--bg-card, #fff)",
-                border: "1px solid var(--border-color, #e5e7eb)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
                 borderRadius: 12,
                 padding: 20,
                 marginBottom: 24,
@@ -52,23 +53,23 @@ export default function EmailSettingsPage() {
                 <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Estado SMTP</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div>
-                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Host</span>
+                        <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Host</span>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{smtpHost}</p>
                     </div>
                     <div>
-                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Puerto</span>
+                        <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Puerto</span>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>587 (por defecto)</p>
                     </div>
                 </div>
-                <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 12 }}>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 12 }}>
                     Las credenciales SMTP se configuran mediante variables de entorno: <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>, <code>SMTP_FROM</code>
                 </p>
             </div>
 
             {/* Test email */}
             <div style={{
-                background: "var(--bg-card, #fff)",
-                border: "1px solid var(--border-color, #e5e7eb)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
                 borderRadius: 12,
                 padding: 20,
             }}>

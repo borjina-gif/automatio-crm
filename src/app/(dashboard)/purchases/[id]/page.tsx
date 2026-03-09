@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Tax {
     id: string;
@@ -139,11 +140,11 @@ function LineItemEditor({
 export default function PurchaseDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showError, showConfirm } = useNotification();
     const [purchase, setPurchase] = useState<PurchaseInvoice | null>(null);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
 
     // Edit state
     const [taxes, setTaxes] = useState<Tax[]>([]);
@@ -166,7 +167,7 @@ export default function PurchaseDetailPage() {
             const data = await res.json();
             setPurchase(data);
         } catch {
-            setError("Factura de proveedor no encontrada");
+            showError("Factura de proveedor no encontrada");
         } finally {
             setLoading(false);
         }
@@ -215,7 +216,6 @@ export default function PurchaseDetailPage() {
 
     async function handleSave() {
         setSaving(true);
-        setError("");
 
         try {
             const res = await fetch(`/api/purchases/${id}`, {
@@ -246,14 +246,14 @@ export default function PurchaseDetailPage() {
             setPurchase(updated);
             setEditing(false);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
     }
 
     async function handleBook() {
-        if (!confirm("¿Contabilizar esta factura? Se asignará un número y no podrá editarse.")) return;
+        if (!await showConfirm("¿Contabilizar esta factura? Se asignará un número y no podrá editarse.")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, {
                 method: "PUT",
@@ -268,7 +268,7 @@ export default function PurchaseDetailPage() {
     }
 
     async function handlePay() {
-        if (!confirm("¿Marcar como pagada?")) return;
+        if (!await showConfirm("¿Marcar como pagada?")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, {
                 method: "PUT",
@@ -297,12 +297,12 @@ export default function PurchaseDetailPage() {
     }
 
     async function handleDelete() {
-        if (!confirm("¿Eliminar esta factura de proveedor?")) return;
+        if (!await showConfirm("¿Eliminar esta factura de proveedor?")) return;
         try {
             const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
             if (res.ok) router.push("/purchases");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -388,11 +388,7 @@ export default function PurchaseDetailPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
+
 
             {editing ? (
                 /* Edit Mode */

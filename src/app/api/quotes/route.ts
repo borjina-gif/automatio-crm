@@ -6,11 +6,22 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get("status");
+        const from = searchParams.get("from");
+        const to = searchParams.get("to");
+
+        const dateFilter: any = {};
+        if (from) dateFilter.gte = new Date(from);
+        if (to) {
+            const toDate = new Date(to);
+            toDate.setHours(23, 59, 59, 999);
+            dateFilter.lte = toDate;
+        }
 
         const quotes = await prisma.quote.findMany({
             where: {
                 deletedAt: null,
                 ...(status ? { status: status as any } : {}),
+                ...(from || to ? { createdAt: dateFilter } : {}),
             },
             include: {
                 client: { select: { id: true, name: true } },

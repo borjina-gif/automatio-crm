@@ -22,10 +22,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             <nav style={{
                 width: 220,
                 flexShrink: 0,
-                borderRight: "1px solid var(--border-color, #e5e7eb)",
+                borderRight: "1px solid var(--color-border)",
                 paddingRight: 20,
             }}>
-                <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "var(--text-secondary)", marginBottom: 12, letterSpacing: 1 }}>
+                <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 12, letterSpacing: 1 }}>
                     Ajustes
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -43,8 +43,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                                     borderRadius: 8,
                                     fontSize: 14,
                                     fontWeight: isActive ? 600 : 400,
-                                    color: isActive ? "var(--color-primary, #1B1660)" : "var(--text-primary, #333)",
-                                    background: isActive ? "var(--bg-active, rgba(27,22,96,0.08))" : "transparent",
+                                    color: isActive ? "var(--color-primary)" : "var(--color-text-secondary)",
+                                    background: isActive ? "var(--color-primary-muted)" : "transparent",
                                     textDecoration: "none",
                                     transition: "all 0.15s ease",
                                 }}

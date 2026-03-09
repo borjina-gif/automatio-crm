@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
+import ServiceAutocomplete from "@/components/ServiceAutocomplete";
 
 interface Tax {
     id: string;
@@ -50,6 +52,7 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
 export default function QuoteDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showSuccess, showError, showConfirm } = useNotification();
     const [quote, setQuote] = useState<any>(null);
     const [clients, setClients] = useState<Client[]>([]);
     const [taxes, setTaxes] = useState<Tax[]>([]);
@@ -61,8 +64,6 @@ export default function QuoteDetailPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [actionLoading, setActionLoading] = useState("");
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
     const [editing, setEditing] = useState(false);
 
     useEffect(() => {
@@ -91,7 +92,7 @@ export default function QuoteDetailPage() {
             );
             setLoading(false);
         }).catch(() => {
-            setError("Presupuesto no encontrado");
+            showError("Presupuesto no encontrado");
             setLoading(false);
         });
     }, [id]);
@@ -133,7 +134,6 @@ export default function QuoteDetailPage() {
 
     async function handleSave() {
         setSaving(true);
-        setError("");
 
         const apiLines = lines.filter((l) => l.description).map((l) => {
             const c = calcLine(l);
@@ -164,7 +164,7 @@ export default function QuoteDetailPage() {
             setQuote(updated);
             setEditing(false);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -173,18 +173,16 @@ export default function QuoteDetailPage() {
     // ── ACTION HANDLERS ─────────────────────────────────
 
     async function handleEmit() {
-        if (!confirm("¿Emitir presupuesto? Se asignará número definitivo y no podrá volver a borrador.")) return;
+        if (!await showConfirm("¿Emitir presupuesto? Se asignará número definitivo y no podrá volver a borrador.")) return;
         setActionLoading("emit");
-        setError("");
         try {
             const res = await fetch(`/api/quotes/${id}/emit`, { method: "POST" });
             if (!res.ok) throw new Error((await res.json()).error);
             const updated = await res.json();
             setQuote(updated);
-            setSuccess("✅ Presupuesto emitido correctamente");
-            setTimeout(() => setSuccess(""), 4000);
+            showSuccess("Presupuesto emitido correctamente");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
@@ -201,7 +199,7 @@ export default function QuoteDetailPage() {
             const updated = await res.json();
             setQuote(updated);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -220,53 +218,50 @@ export default function QuoteDetailPage() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
     }
 
     async function handleSendEmail() {
-        if (!confirm("¿Enviar presupuesto por email al cliente?")) return;
+        if (!await showConfirm("¿Enviar presupuesto por email al cliente?")) return;
         setActionLoading("send");
-        setError("");
         try {
             const res = await fetch(`/api/quotes/${id}/send`, { method: "POST" });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            setSuccess(`📧 Enviado a ${data.sentTo}`);
-            setTimeout(() => setSuccess(""), 5000);
+            showSuccess(`Enviado a ${data.sentTo}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
     }
 
     async function handleConvert() {
-        if (!confirm("¿Convertir presupuesto a factura? Se creará una factura borrador con las mismas líneas.")) return;
+        if (!await showConfirm("¿Convertir presupuesto a factura? Se creará una factura borrador con las mismas líneas.")) return;
         setActionLoading("convert");
-        setError("");
         try {
             const res = await fetch(`/api/quotes/${id}/convert`, { method: "POST" });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            setSuccess("🔄 Factura creada. Redirigiendo...");
+            showSuccess("Factura creada. Redirigiendo...");
             setTimeout(() => router.push(`/invoices/${data.id}`), 1500);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setActionLoading("");
         }
     }
 
     async function handleDelete() {
-        if (!confirm("¿Eliminar este presupuesto?")) return;
+        if (!await showConfirm("¿Eliminar este presupuesto?")) return;
         try {
             await fetch(`/api/quotes/${id}`, { method: "DELETE" });
             router.push("/quotes");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -369,16 +364,7 @@ export default function QuoteDetailPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
-            {success && (
-                <div className="toast toast-success" style={{ position: "static", marginBottom: 16 }}>
-                    {success}
-                </div>
-            )}
+
 
             {/* Edit mode or read-only */}
             {editing ? (
@@ -419,7 +405,20 @@ export default function QuoteDetailPage() {
                                     const c = calcLine(line);
                                     return (
                                         <div className="line-row" key={line.key}>
-                                            <input className="line-input" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} placeholder="Concepto..." />
+                                            <ServiceAutocomplete
+                                                value={line.description}
+                                                onChange={(val) => updateLine(line.key, "description", val)}
+                                                onServiceSelect={(svc) => {
+                                                    setLines((prev) =>
+                                                        prev.map((l) =>
+                                                            l.key === line.key
+                                                                ? { ...l, description: svc.description, unitPriceEuros: svc.unitPriceEuros, taxId: svc.taxId, taxRate: svc.taxRate }
+                                                                : l
+                                                        )
+                                                    );
+                                                }}
+                                                placeholder="Concepto... (@ para servicios)"
+                                            />
                                             <input className="line-input" type="number" step="0.01" min="0" value={line.quantity} onChange={(e) => updateLine(line.key, "quantity", e.target.value)} />
                                             <input className="line-input" type="number" step="0.01" min="0" value={line.unitPriceEuros} onChange={(e) => updateLine(line.key, "unitPriceEuros", e.target.value)} />
                                             <select className="line-input" value={line.taxId} onChange={(e) => updateLine(line.key, "taxId", e.target.value)}>

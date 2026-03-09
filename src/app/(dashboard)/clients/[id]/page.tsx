@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Client {
     id: string;
@@ -50,11 +51,11 @@ function fmtDate(d: string | null) {
 export default function ClientDetailPage() {
     const { id } = useParams();
     const router = useRouter();
+    const { showError, showConfirm } = useNotification();
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
     const [tab, setTab] = useState<"datos" | "historial">("datos");
     const [invoices, setInvoices] = useState<HistoryItem[]>([]);
     const [quotes, setQuotes] = useState<HistoryItem[]>([]);
@@ -69,7 +70,7 @@ export default function ClientDetailPage() {
             const data = await res.json();
             setClient(data);
         } catch {
-            setError("Cliente no encontrado");
+            showError("Cliente no encontrado");
         } finally {
             setLoading(false);
         }
@@ -93,7 +94,6 @@ export default function ClientDetailPage() {
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
-        setError("");
 
         const form = new FormData(e.currentTarget);
         const data = Object.fromEntries(form.entries());
@@ -114,21 +114,21 @@ export default function ClientDetailPage() {
             setClient(updated);
             setEditing(false);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
     }
 
     async function handleDelete() {
-        if (!confirm("¿Estás seguro de que quieres eliminar este cliente?")) return;
+        if (!await showConfirm("¿Estás seguro de que quieres eliminar este cliente?")) return;
 
         try {
             const res = await fetch(`/api/clients/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Error al eliminar");
             router.push("/clients");
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         }
     }
 
@@ -181,11 +181,7 @@ export default function ClientDetailPage() {
                 </div>
             </div>
 
-            {error && (
-                <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                    {error}
-                </div>
-            )}
+
 
             {/* ── Tab Switcher ── */}
             <div className="detail-tabs" style={{ display: "flex", gap: 0, marginBottom: 20 }}>

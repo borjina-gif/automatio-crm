@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Tax {
     id: string;
@@ -12,9 +13,9 @@ interface Tax {
 
 export default function NewServicePage() {
     const router = useRouter();
+    const { showError } = useNotification();
     const [taxes, setTaxes] = useState<Tax[]>([]);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
     const [priceEuros, setPriceEuros] = useState("");
 
     useEffect(() => {
@@ -26,7 +27,6 @@ export default function NewServicePage() {
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setSaving(true);
-        setError("");
 
         const form = new FormData(e.currentTarget);
         const name = form.get("name") as string;
@@ -56,7 +56,7 @@ export default function NewServicePage() {
             const service = await res.json();
             router.push(`/services/${service.id}`);
         } catch (err: any) {
-            setError(err.message);
+            showError(err.message);
         } finally {
             setSaving(false);
         }
@@ -76,11 +76,7 @@ export default function NewServicePage() {
 
             <div className="card">
                 <div className="card-body">
-                    {error && (
-                        <div className="toast toast-error" style={{ position: "static", marginBottom: 16 }}>
-                            {error}
-                        </div>
-                    )}
+
                     <form onSubmit={handleSubmit}>
                         <div className="form-row">
                             <div className="form-group">

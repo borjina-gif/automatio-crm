@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getNextNumber } from "@/lib/numbering";
 import { generateInvoicePDF } from "@/lib/pdf";
-import { sendDocumentEmail, buildInvoiceEmailBody } from "@/lib/email";
+import { sendDocumentEmail, buildInvoiceEmailBody, sendNotificationEmail } from "@/lib/email";
 import { logActivity } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -161,6 +161,43 @@ export async function POST(
             action: "manual_run",
             invoiceId: invoice.id,
         });
+
+        // Send confirmation email to company
+        if (company.email) {
+            const invoiceNum = invoice.number || "BORRADOR";
+            const totalFormatted = (totalCents / 100).toLocaleString("es-ES", { minimumFractionDigits: 2 });
+            const statusLabel = runStatus === "SUCCESS" ? "✅ Emitida y enviada" : "📄 Generada como borrador";
+            const errorLine = errorMessage ? `<p style="color:#ef4444">⚠️ ${errorMessage}</p>` : "";
+
+            const htmlBody = `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+                <div style="background:#1e1e32;padding:20px;border-radius:8px 8px 0 0">
+                    <h1 style="color:#fff;margin:0;font-size:20px">Factura Recurrente Ejecutada</h1>
+                    <p style="color:#a0a0c0;margin:4px 0 0">Ejecución manual</p>
+                </div>
+                <div style="padding:24px;background:#f8f9fa;border:1px solid #e0e0e0">
+                    <p>Se ha ejecutado la plantilla <strong>${template.name}</strong>:</p>
+                    <ul style="margin:8px 0 16px">
+                        <li>Factura: <strong>${invoiceNum}</strong></li>
+                        <li>Cliente: <strong>${template.client?.name || "—"}</strong></li>
+                        <li>Importe: <strong>${totalFormatted} €</strong></li>
+                        <li>Estado: ${statusLabel}</li>
+                    </ul>
+                    ${errorLine}
+                    <p style="color:#888;font-size:12px">Automatio solutions S.L · info@automatio.es</p>
+                </div>
+            </div>`;
+
+            try {
+                await sendNotificationEmail(
+                    company.email,
+                    `Recurrente ejecutada: ${template.name} — ${invoiceNum}`,
+                    htmlBody
+                );
+            } catch (emailErr) {
+                console.error("Error sending manual run notification:", emailErr);
+            }
+        }
 
         return NextResponse.json({
             success: true,

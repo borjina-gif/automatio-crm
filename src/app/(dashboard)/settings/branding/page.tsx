@@ -73,22 +73,23 @@ export default function BrandingSettingsPage() {
         }
     };
 
-    if (loading) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    if (loading) return <p style={{ color: "var(--color-text-secondary)" }}>Cargando…</p>;
     if (!branding) return <p>Error al cargar branding</p>;
 
     const fieldStyle: React.CSSProperties = {
         width: "100%",
         padding: "10px 14px",
         borderRadius: 8,
-        border: "1px solid var(--border-color, #e5e7eb)",
+        border: "1px solid var(--color-border)",
         fontSize: 14,
-        background: "var(--bg-input, #fff)",
+        background: "var(--color-surface)",
+        color: "var(--color-text)",
     };
 
     const labelStyle: React.CSSProperties = {
         fontSize: 13,
         fontWeight: 600,
-        color: "var(--text-secondary, #666)",
+        color: "var(--color-text-secondary)",
         marginBottom: 4,
         display: "block",
     };
@@ -105,9 +106,9 @@ export default function BrandingSettingsPage() {
                     alignItems: "center",
                     gap: 20,
                     padding: 20,
-                    border: "2px dashed var(--border-color, #e5e7eb)",
+                    border: "2px dashed var(--color-border)",
                     borderRadius: 12,
-                    background: "var(--bg-card, #fafafa)",
+                    background: "var(--color-surface)",
                 }}>
                     {branding.logoBase64 ? (
                         <img src={branding.logoBase64} alt="Logo" style={{ maxHeight: 80, maxWidth: 200, objectFit: "contain" }} />
@@ -143,7 +144,7 @@ export default function BrandingSettingsPage() {
                             Subir logo
                         </button>
                         <input ref={fileInputRef} type="file" accept="image/png,image/svg+xml,image/jpeg" onChange={handleLogoUpload} style={{ display: "none" }} />
-                        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>PNG, SVG o JPG. Máximo 2MB.</p>
+                        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 6 }}>PNG, SVG o JPG. Máximo 2MB.</p>
                     </div>
                 </div>
             </div>
@@ -198,7 +199,7 @@ export default function BrandingSettingsPage() {
             <div style={{ marginBottom: 24 }}>
                 <label style={labelStyle}>Vista previa</label>
                 <div style={{
-                    border: "1px solid var(--border-color, #e5e7eb)",
+                    border: "1px solid var(--color-border)",
                     borderRadius: 12,
                     overflow: "hidden",
                 }}>

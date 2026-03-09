@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useNotification } from "@/components/NotificationContext";
 
 interface Tax {
     id: string;
@@ -20,7 +21,7 @@ export default function TaxesSettingsPage() {
     const [showModal, setShowModal] = useState(false);
     const [editTax, setEditTax] = useState<Tax | null>(null);
     const [form, setForm] = useState({ name: "", type: "IVA", rate: "21", isDefaultSales: false, isDefaultPurchases: false });
-    const [message, setMessage] = useState("");
+    const { showSuccess, showError, showConfirm } = useNotification();
 
     const fetchTaxes = useCallback(async () => {
         try {
@@ -28,7 +29,7 @@ export default function TaxesSettingsPage() {
             const data = await res.json();
             setTaxes(data);
         } catch {
-            setMessage("Error al cargar impuestos");
+            showError("Error al cargar impuestos");
         } finally {
             setLoading(false);
         }
@@ -70,33 +71,34 @@ export default function TaxesSettingsPage() {
                 });
             }
             setShowModal(false);
-            setMessage("✅ Impuesto guardado");
+            showSuccess("Impuesto guardado");
             fetchTaxes();
         } catch {
-            setMessage("❌ Error al guardar impuesto");
+            showError("Error al guardar impuesto");
         }
     };
 
     const handleDeactivate = async (id: string) => {
-        if (!confirm("¿Desactivar este impuesto?")) return;
+        if (!await showConfirm("¿Desactivar este impuesto?")) return;
         try {
             await fetch(`/api/taxes/${id}`, { method: "DELETE" });
-            setMessage("✅ Impuesto desactivado");
+            showSuccess("Impuesto desactivado");
             fetchTaxes();
         } catch {
-            setMessage("❌ Error al desactivar");
+            showError("Error al desactivar");
         }
     };
 
-    if (loading) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
+    if (loading) return <p style={{ color: "var(--color-text-secondary)" }}>Cargando…</p>;
 
     const fieldStyle: React.CSSProperties = {
         width: "100%",
         padding: "10px 14px",
         borderRadius: 8,
-        border: "1px solid var(--border-color, #e5e7eb)",
+        border: "1px solid var(--color-border)",
         fontSize: 14,
-        background: "var(--bg-input, #fff)",
+        background: "var(--color-surface)",
+        color: "var(--color-text)",
     };
 
     return (
@@ -117,18 +119,18 @@ export default function TaxesSettingsPage() {
 
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                    <tr style={{ borderBottom: "2px solid var(--border-color, #e5e7eb)" }}>
-                        <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Nombre</th>
-                        <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Tipo</th>
-                        <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Tasa %</th>
-                        <th style={{ textAlign: "center", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Def. Ventas</th>
-                        <th style={{ textAlign: "center", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Def. Compras</th>
-                        <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 13, color: "var(--text-secondary)" }}>Acciones</th>
+                    <tr style={{ borderBottom: "2px solid var(--color-border)" }}>
+                        <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Nombre</th>
+                        <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Tipo</th>
+                        <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Tasa %</th>
+                        <th style={{ textAlign: "center", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Def. Ventas</th>
+                        <th style={{ textAlign: "center", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Def. Compras</th>
+                        <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 13, color: "var(--color-text-secondary)" }}>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {taxes.map((tax) => (
-                        <tr key={tax.id} style={{ borderBottom: "1px solid var(--border-color, #e5e7eb)" }}>
+                        <tr key={tax.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
                             <td style={{ padding: "12px", fontWeight: 600 }}>{tax.name}</td>
                             <td style={{ padding: "12px" }}>
                                 <span style={{
@@ -140,7 +142,7 @@ export default function TaxesSettingsPage() {
                                     color: tax.type === "IVA" ? "#1d4ed8" : tax.type === "IRPF" ? "#92400e" : "#374151",
                                 }}>{tax.type}</span>
                             </td>
-                            <td style={{ padding: "12px", textAlign: "right", fontFamily: "monospace" }}>{Number(tax.rate).toFixed(2)}%</td>
+                            <td style={{ padding: "12px", textAlign: "right", fontFamily: "var(--font-mono)" }}>{Number(tax.rate).toFixed(2)}%</td>
                             <td style={{ padding: "12px", textAlign: "center" }}>{tax.isDefaultSales ? "✅" : "—"}</td>
                             <td style={{ padding: "12px", textAlign: "center" }}>{tax.isDefaultPurchases ? "✅" : "—"}</td>
                             <td style={{ padding: "12px", textAlign: "right" }}>
@@ -152,12 +154,12 @@ export default function TaxesSettingsPage() {
                 </tbody>
             </table>
 
-            {message && <p style={{ fontSize: 14, marginTop: 12 }}>{message}</p>}
+
 
             {/* Modal */}
             {showModal && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-                    <div style={{ background: "var(--bg-card, #fff)", borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw" }}>
+                    <div style={{ background: "var(--color-surface)", borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw" }}>
                         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{editTax ? "Editar impuesto" : "Nuevo impuesto"}</h3>
 
                         <div style={{ marginBottom: 12 }}>
