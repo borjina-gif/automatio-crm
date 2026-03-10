@@ -525,8 +525,8 @@ export default function QuoteDetailPage() {
                                 {(quote.lines || []).map((line: any) => (
                                     <tr key={line.id}>
                                         <td>{line.position}</td>
-                                        <td className="cell-primary">{line.description}</td>
-                                        <td style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>{line.details || "—"}</td>
+                                        <td className="cell-primary" style={{ fontWeight: 600 }}>{line.description}</td>
+                                        <td style={{ color: "var(--color-text-secondary)", fontSize: 13, whiteSpace: "pre-wrap" }}>{line.details || ""}</td>
                                         <td>{Number(line.quantity)}</td>
                                         <td className="cell-amount">{formatCents(line.unitPriceCents)} €</td>
                                         <td>{line.tax?.name || "—"}</td>

@@ -153,17 +153,11 @@ export default function ServiceAutocomplete({
             maximumFractionDigits: 2,
         });
 
-    // Auto-resize textarea
-    useEffect(() => {
-        if (inputRef.current) {
-            inputRef.current.style.height = "auto";
-            inputRef.current.style.height = inputRef.current.scrollHeight + "px";
-        }
-    }, [value]);
+
 
     return (
         <div className="sac-wrapper">
-            <textarea
+            <input
                 ref={inputRef as any}
                 className={className}
                 placeholder={placeholder}
@@ -171,14 +165,8 @@ export default function ServiceAutocomplete({
                 onChange={handleInput as any}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
-                rows={1}
                 style={{
-                    resize: "none",
-                    overflow: "hidden",
-                    minHeight: "38px",
-                    lineHeight: "1.4",
-                    paddingTop: "8px",
-                    paddingBottom: "8px",
+                    fontWeight: 600,
                 }}
             />
             {showDropdown && services.length > 0 && (

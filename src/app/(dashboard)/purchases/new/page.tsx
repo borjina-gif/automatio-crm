@@ -63,6 +63,7 @@ function LineItemEditor({
                 placeholder="Concepto"
                 value={line.description}
                 onChange={(e) => updateLine(line.key, "description", e.target.value)}
+                style={{ fontWeight: 600 }}
             />
             <textarea
                 className="line-input line-details"
