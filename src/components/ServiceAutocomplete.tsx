@@ -34,7 +34,7 @@ export default function ServiceAutocomplete({
     const [services, setServices] = useState<Service[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const [query, setQuery] = useState("");
-    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -60,7 +60,7 @@ export default function ServiceAutocomplete({
         }
     }, []);
 
-    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newVal = e.target.value;
         onChange(newVal);
 
@@ -158,11 +158,11 @@ export default function ServiceAutocomplete({
     return (
         <div className="sac-wrapper">
             <input
-                ref={inputRef as any}
+                ref={inputRef}
                 className={className}
                 placeholder={placeholder}
                 value={value}
-                onChange={handleInput as any}
+                onChange={handleInput}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
                 style={{
