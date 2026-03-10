@@ -331,6 +331,7 @@ model QuoteLine {
   quoteId           String   @map("quote_id") @db.Uuid
   position          Int
   description       String
+  details           String?
   quantity          Decimal  @db.Decimal(10, 2)
   unitPriceCents    Int      @map("unit_price_cents")
   taxId             String?  @map("tax_id") @db.Uuid
@@ -388,6 +389,7 @@ model InvoiceLine {
   invoiceId         String   @map("invoice_id") @db.Uuid
   position          Int
   description       String
+  details           String?
   quantity          Decimal  @db.Decimal(10, 2)
   unitPriceCents    Int      @map("unit_price_cents")
   taxId             String?  @map("tax_id") @db.Uuid
@@ -439,6 +441,7 @@ model PurchaseInvoiceLine {
   purchaseInvoiceId String          @map("purchase_invoice_id") @db.Uuid
   position          Int
   description       String
+  details           String?
   quantity          Decimal         @db.Decimal(10, 2)
   unitPriceCents    Int             @map("unit_price_cents")
   taxId             String?         @map("tax_id") @db.Uuid

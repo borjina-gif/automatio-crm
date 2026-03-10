@@ -217,11 +217,11 @@ export default function InvoiceDetailPage() {
                     <thead>
                         <tr>
                             <th style={{ width: 30 }}>#</th>
+                            <th>Concepto</th>
                             <th>Descripción</th>
                             <th>Cantidad</th>
                             <th>Precio</th>
                             <th>Impuesto</th>
-                            <th>Subtotal</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -230,10 +230,10 @@ export default function InvoiceDetailPage() {
                             <tr key={line.id}>
                                 <td>{line.position}</td>
                                 <td className="cell-primary">{line.description}</td>
+                                <td style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>{line.details || "—"}</td>
                                 <td>{Number(line.quantity)}</td>
                                 <td className="cell-amount">{formatCents(line.unitPriceCents)} €</td>
                                 <td>{line.tax?.name || "—"}</td>
-                                <td className="cell-amount">{formatCents(line.lineSubtotalCents)} €</td>
                                 <td className="cell-amount" style={{ fontWeight: 600 }}>{formatCents(line.lineTotalCents)} €</td>
                             </tr>
                         ))}

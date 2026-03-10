@@ -21,6 +21,7 @@ interface Client {
 interface LineItem {
     key: string;
     description: string;
+    details: string;
     quantity: string;
     unitPriceEuros: string;
     taxId: string;
@@ -31,6 +32,7 @@ function emptyLine(): LineItem {
     return {
         key: crypto.randomUUID(),
         description: "",
+        details: "",
         quantity: "1",
         unitPriceEuros: "",
         taxId: "",
@@ -140,6 +142,7 @@ export default function NewQuotePage() {
                 const c = calcLine(l);
                 return {
                     description: l.description,
+                    details: l.details || null,
                     quantity: parseFloat(l.quantity) || 0,
                     unitPriceCents: c.unitCents,
                     taxId: l.taxId || null,
@@ -244,12 +247,11 @@ export default function NewQuotePage() {
                     <div className="lines-editor">
                         {/* Header */}
                         <div className="line-row line-row-header">
+                            <span>Concepto</span>
                             <span>Descripción</span>
                             <span>Cantidad</span>
                             <span>Precio (€)</span>
                             <span>Impuesto</span>
-                            <span>Subtotal</span>
-                            <span>IVA</span>
                             <span>Total</span>
                             <span></span>
                         </div>
@@ -271,6 +273,14 @@ export default function NewQuotePage() {
                                                 )
                                             );
                                         }}
+                                        placeholder="Escribe el concepto o usa @ para buscar..."
+                                    />
+                                    <textarea
+                                        className="line-input line-details"
+                                        placeholder="Desc"
+                                        value={line.details}
+                                        onChange={(e) => updateLine(line.key, "details", e.target.value)}
+                                        rows={1}
                                     />
                                     <input
                                         className="line-input"
@@ -299,8 +309,6 @@ export default function NewQuotePage() {
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
-                                    <span className="line-computed">{formatCents(c.subtotalCents)}</span>
-                                    <span className="line-computed">{formatCents(c.taxCents)}</span>
                                     <span className="line-computed" style={{ fontWeight: 600, color: "var(--color-text)" }}>
                                         {formatCents(c.totalCents)}
                                     </span>

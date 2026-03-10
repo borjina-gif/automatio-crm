@@ -65,6 +65,7 @@ export async function POST(request: Request) {
             return {
                 position: idx + 1,
                 description: line.description || "",
+                details: line.details || null,
                 quantity: qty,
                 unitPriceCents: unitCents,
                 taxId: line.taxId || null,

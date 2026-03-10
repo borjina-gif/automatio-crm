@@ -12,6 +12,7 @@ import { LOGO_BASE64 } from "./logo-base64";
 interface DocumentLine {
     position: number;
     description: string;
+    details?: string | null;
     quantity: number;
     unitPriceCents: number;
     lineSubtotalCents: number;
@@ -361,9 +362,20 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     for (const line of data.lines) {
         // Pre-calculate row height from description wrapping
         doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        const descLines = doc.splitTextToSize(line.description, DESC_MAX_W) as string[];
-        const rowHeight = Math.max(descLines.length * 4.5, 7);
+        doc.setFont("helvetica", "bold");
+        const conceptLines = doc.splitTextToSize(line.description, DESC_MAX_W) as string[];
+        let rowHeight = conceptLines.length * 4.5;
+
+        // Calculate details height if present
+        let detailLines: string[] = [];
+        if (line.details) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            detailLines = doc.splitTextToSize(line.details, DESC_MAX_W) as string[];
+            rowHeight += detailLines.length * 3.8 + 1;
+        }
+
+        rowHeight = Math.max(rowHeight, 7);
 
         // Page break if needed — redraw header on new page
         if (needsBreak(rowHeight + 2)) {
@@ -371,19 +383,34 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
             drawTableHeader();
         }
 
-        // Description
+        // Concept (bold)
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...TEXT_DARK);
+        doc.text(conceptLines, COL_CONCEPTO, y);
+
+        // Details (lighter, below concept)
+        let detailsEndY = y + conceptLines.length * 4.5;
+        if (detailLines.length > 0) {
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...TEXT_MEDIUM);
+            detailsEndY += 1;
+            doc.text(detailLines, COL_CONCEPTO, detailsEndY);
+            detailsEndY += detailLines.length * 3.8;
+        }
+
+        // Numeric columns (aligned to first line of concept)
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...TEXT_DARK);
-        doc.text(descLines, COL_CONCEPTO, y);
-
-        // Numeric columns (aligned to first line of description)
         doc.text(`${fmtCents(line.unitPriceCents)}€`, COL_PRECIO, y, { align: "right" });
         doc.text(String(Number(line.quantity)), COL_UNIDADES, y, { align: "right" });
         doc.text(`${fmtCents(line.lineSubtotalCents)}€`, COL_SUBTOTAL, y, { align: "right" });
         doc.text(line.tax ? `${line.tax.rate}%` : "—", COL_IVA, y, { align: "right" });
         doc.text(`${fmtCents(line.lineTotalCents)}€`, RE, y, { align: "right" });
 
-        y += rowHeight;
+        y = detailsEndY + 2;
     }
 
     // Bottom line under table

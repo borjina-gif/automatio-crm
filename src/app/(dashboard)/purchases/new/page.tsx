@@ -20,6 +20,7 @@ interface Tax {
 interface LineItem {
     key: string;
     description: string;
+    details: string;
     quantity: string;
     unitPriceCents: string;
     taxId: string;
@@ -30,6 +31,7 @@ function newLine(): LineItem {
     return {
         key: crypto.randomUUID(),
         description: "",
+        details: "",
         quantity: "1",
         unitPriceCents: "0",
         taxId: "",
@@ -56,13 +58,18 @@ function LineItemEditor({
 
     return (
         <div className="line-row" key={line.key}>
-            <textarea
+            <input
                 className="line-input line-input-desc"
-                placeholder="Descripción"
+                placeholder="Concepto"
                 value={line.description}
                 onChange={(e) => updateLine(line.key, "description", e.target.value)}
+            />
+            <textarea
+                className="line-input line-details"
+                placeholder="Desc"
+                value={line.details}
+                onChange={(e) => updateLine(line.key, "details", e.target.value)}
                 rows={1}
-                style={{ resize: 'none', minHeight: '38px' }}
             />
             <input
                 className="line-input line-input-sm"
@@ -174,6 +181,7 @@ export default function NewPurchasePage() {
                     notes: notes || null,
                     lines: lines.map((l) => ({
                         description: l.description,
+                        details: l.details || null,
                         quantity: l.quantity,
                         unitPriceCents: l.unitPriceCents,
                         taxId: l.taxId || null,

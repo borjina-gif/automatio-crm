@@ -20,6 +20,7 @@ interface Client {
 interface LineItem {
     key: string;
     description: string;
+    details: string;
     quantity: string;
     unitPriceEuros: string;
     taxId: string;
@@ -84,6 +85,7 @@ export default function QuoteDetailPage() {
                 (q.lines || []).map((l: any) => ({
                     key: l.id || crypto.randomUUID(),
                     description: l.description,
+                    details: l.details || "",
                     quantity: String(l.quantity),
                     unitPriceEuros: (l.unitPriceCents / 100).toFixed(2),
                     taxId: l.taxId || "",
@@ -117,6 +119,7 @@ export default function QuoteDetailPage() {
             {
                 key: crypto.randomUUID(),
                 description: "",
+                details: "",
                 quantity: "1",
                 unitPriceEuros: "",
                 taxId: defaultTax?.id || "",
@@ -139,6 +142,7 @@ export default function QuoteDetailPage() {
             const c = calcLine(l);
             return {
                 description: l.description,
+                details: l.details || null,
                 quantity: parseFloat(l.quantity) || 0,
                 unitPriceCents: c.unitCents,
                 taxId: l.taxId || null,
@@ -398,8 +402,8 @@ export default function QuoteDetailPage() {
                         <div className="card-body">
                             <div className="lines-editor">
                                 <div className="line-row line-row-header">
-                                    <span>Descripción</span><span>Cant.</span><span>Precio (€)</span><span>Impuesto</span>
-                                    <span>Subtotal</span><span>IVA</span><span>Total</span><span></span>
+                                    <span>Concepto</span><span>Descripción</span><span>Cant.</span><span>Precio (€)</span><span>Impuesto</span>
+                                    <span>Total</span><span></span>
                                 </div>
                                 {lines.map((line) => {
                                     const c = calcLine(line);
@@ -419,14 +423,19 @@ export default function QuoteDetailPage() {
                                                 }}
                                                 placeholder="Concepto... (@ para servicios)"
                                             />
+                                            <textarea
+                                                className="line-input line-details"
+                                                placeholder="Desc"
+                                                value={line.details}
+                                                onChange={(e) => updateLine(line.key, "details", e.target.value)}
+                                                rows={1}
+                                            />
                                             <input className="line-input" type="number" step="0.01" min="0" value={line.quantity} onChange={(e) => updateLine(line.key, "quantity", e.target.value)} />
                                             <input className="line-input" type="number" step="0.01" min="0" value={line.unitPriceEuros} onChange={(e) => updateLine(line.key, "unitPriceEuros", e.target.value)} />
                                             <select className="line-input" value={line.taxId} onChange={(e) => updateLine(line.key, "taxId", e.target.value)}>
                                                 <option value="">Sin IVA</option>
                                                 {taxes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                                             </select>
-                                            <span className="line-computed">{formatCents(c.subtotalCents)}</span>
-                                            <span className="line-computed">{formatCents(c.taxCents)}</span>
                                             <span className="line-computed" style={{ fontWeight: 600, color: "var(--color-text)" }}>{formatCents(c.totalCents)}</span>
                                             <button className="line-delete-btn" onClick={() => removeLine(line.key)}>✕</button>
                                         </div>
@@ -504,11 +513,11 @@ export default function QuoteDetailPage() {
                             <thead>
                                 <tr>
                                     <th style={{ width: 30 }}>#</th>
+                                    <th>Concepto</th>
                                     <th>Descripción</th>
                                     <th>Cant.</th>
                                     <th>Precio</th>
                                     <th>Impuesto</th>
-                                    <th>Subtotal</th>
                                     <th>Total</th>
                                 </tr>
                             </thead>
@@ -517,10 +526,10 @@ export default function QuoteDetailPage() {
                                     <tr key={line.id}>
                                         <td>{line.position}</td>
                                         <td className="cell-primary">{line.description}</td>
+                                        <td style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>{line.details || "—"}</td>
                                         <td>{Number(line.quantity)}</td>
                                         <td className="cell-amount">{formatCents(line.unitPriceCents)} €</td>
                                         <td>{line.tax?.name || "—"}</td>
-                                        <td className="cell-amount">{formatCents(line.lineSubtotalCents)} €</td>
                                         <td className="cell-amount" style={{ fontWeight: 600 }}>{formatCents(line.lineTotalCents)} €</td>
                                     </tr>
                                 ))}

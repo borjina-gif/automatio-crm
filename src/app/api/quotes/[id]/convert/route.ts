@@ -52,6 +52,7 @@ export async function POST(
                         create: quote.lines.map((line) => ({
                             position: line.position,
                             description: line.description,
+                            details: line.details,
                             quantity: line.quantity,
                             unitPriceCents: line.unitPriceCents,
                             taxId: line.taxId,
