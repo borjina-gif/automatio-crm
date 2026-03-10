@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNotification } from "@/components/NotificationContext";
+import ProviderModal from "@/components/ProviderModal";
 
 interface Provider {
     id: string;
@@ -55,11 +56,13 @@ function LineItemEditor({
 
     return (
         <div className="line-row" key={line.key}>
-            <input
+            <textarea
                 className="line-input line-input-desc"
                 placeholder="Descripción"
                 value={line.description}
                 onChange={(e) => updateLine(line.key, "description", e.target.value)}
+                rows={1}
+                style={{ resize: 'none', minHeight: '38px' }}
             />
             <input
                 className="line-input line-input-sm"
@@ -106,6 +109,7 @@ export default function NewPurchasePage() {
     const [notes, setNotes] = useState("");
     const [lines, setLines] = useState<LineItem[]>([newLine()]);
     const [saving, setSaving] = useState(false);
+    const [showProviderModal, setShowProviderModal] = useState(false);
 
     useEffect(() => {
         fetch("/api/providers").then((r) => r.json()).then((d) => setProviders(Array.isArray(d) ? d : []));
@@ -210,7 +214,17 @@ export default function NewPurchasePage() {
                 <div className="card-body">
                     <div className="form-row">
                         <div className="form-group" style={{ flex: 2 }}>
-                            <label className="form-label">Proveedor *</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="form-label" style={{ marginBottom: 0 }}>Proveedor *</label>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => setShowProviderModal(true)}
+                                    style={{ padding: '0 4px', fontSize: '11.5px', color: 'var(--color-primary)' }}
+                                >
+                                    + Nuevo Proveedor
+                                </button>
+                            </div>
                             <select
                                 className="form-input"
                                 value={providerId}
@@ -338,6 +352,14 @@ export default function NewPurchasePage() {
                     Cancelar
                 </Link>
             </div>
+            <ProviderModal
+                isOpen={showProviderModal}
+                onClose={() => setShowProviderModal(false)}
+                onSuccess={(provider) => {
+                    setProviders((prev) => [...prev, provider]);
+                    setProviderId(provider.id);
+                }}
+            />
         </>
     );
 }

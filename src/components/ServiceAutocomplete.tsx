@@ -34,7 +34,7 @@ export default function ServiceAutocomplete({
     const [services, setServices] = useState<Service[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const [query, setQuery] = useState("");
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -60,7 +60,7 @@ export default function ServiceAutocomplete({
         }
     }, []);
 
-    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newVal = e.target.value;
         onChange(newVal);
 
@@ -153,16 +153,33 @@ export default function ServiceAutocomplete({
             maximumFractionDigits: 2,
         });
 
+    // Auto-resize textarea
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.style.height = "auto";
+            inputRef.current.style.height = inputRef.current.scrollHeight + "px";
+        }
+    }, [value]);
+
     return (
         <div className="sac-wrapper">
-            <input
-                ref={inputRef}
+            <textarea
+                ref={inputRef as any}
                 className={className}
                 placeholder={placeholder}
                 value={value}
-                onChange={handleInput}
+                onChange={handleInput as any}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
+                rows={1}
+                style={{
+                    resize: "none",
+                    overflow: "hidden",
+                    minHeight: "38px",
+                    lineHeight: "1.4",
+                    paddingTop: "8px",
+                    paddingBottom: "8px",
+                }}
             />
             {showDropdown && services.length > 0 && (
                 <div className="sac-dropdown" ref={dropdownRef}>

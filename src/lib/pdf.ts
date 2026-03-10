@@ -235,17 +235,6 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     //    Each column wraps text within its max width
     // ══════════════════════════════════════════════════════
 
-    const col1X = ML;
-    const col2X = ML + CW * 0.36;
-    const col3X = ML + CW * 0.66;
-    const col1W = CW * 0.34;   // column 1 width
-    const col2W = CW * 0.28;   // column 2 width
-    const col3W = CW * 0.32;   // column 3 width
-
-    const blockStartY = y;
-
-    // — Pre-compute all column content as wrapped lines —
-
     // Column 1: Emisor (Company)
     const companyLines: string[] = [];
     companyLines.push(data.company.legalName);
@@ -263,20 +252,10 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     if (companyCountry) companyLines.push(companyCountry);
     if (data.company.email) companyLines.push(data.company.email);
 
-    // Column 2: Dirección de envío
-    const shippingLines: string[] = [];
-    if (data.client.billingAddressLine1) shippingLines.push(data.client.billingAddressLine1);
-    const shipLoc = [
-        data.client.billingPostalCode,
-        data.client.billingCity,
-        data.client.billingProvince,
-    ].filter(Boolean).join(", ");
-    if (shipLoc) shippingLines.push(shipLoc);
-    shippingLines.push("España");
-
-    // Column 3: Cliente
+    // Column 2: Cliente
     const clientLines: string[] = [];
-    clientLines.push(data.client.name);
+    clientLines.push(data.client.name.toUpperCase());
+    if (data.client.taxId) clientLines.push(`NIF/CIF: ${data.client.taxId}`);
     if (data.client.billingAddressLine1) clientLines.push(data.client.billingAddressLine1);
     const clientLoc = [
         data.client.billingPostalCode,
@@ -285,7 +264,6 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
     ].filter(Boolean).join(", ");
     if (clientLoc) clientLines.push(clientLoc);
     clientLines.push("España");
-    if (data.client.taxId) clientLines.push(`NIF/CIF: ${data.client.taxId}`);
 
     // — Draw columns with splitTextToSize for proper wrapping —
 
@@ -306,18 +284,24 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
             cy += 5;
         }
 
-        doc.setFontSize(8.5);
+        doc.setFontSize(8.4);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...TEXT_MEDIUM);
 
         for (let i = 0; i < lines.length; i++) {
-            // First line of company is bold
+            // First line is bold if no title
             if (!title && i === 0) {
                 doc.setFont("helvetica", "bold");
                 doc.setTextColor(...TEXT_DARK);
+                doc.setFontSize(9.5);
+            } else if (title && i === 0) {
+               doc.setFont("helvetica", "bold");
+               doc.setTextColor(...TEXT_DARK);
+               doc.setFontSize(8.4);
             } else {
                 doc.setFont("helvetica", "normal");
                 doc.setTextColor(...TEXT_MEDIUM);
+                doc.setFontSize(8.4);
             }
 
             const wrapped = doc.splitTextToSize(lines[i], maxW) as string[];
@@ -330,11 +314,17 @@ export function generateDocumentPDF(data: DocumentData): Buffer {
         return cy;
     }
 
+    const col1X = ML;
+    const col3X = ML + CW * 0.64;
+    const col1W = CW * 0.45;
+    const col3W = CW * 0.36;
+
+    const blockStartY = y;
+
     const endCol1 = drawColumn(companyLines, col1X, blockStartY, col1W);
-    const endCol2 = drawColumn(shippingLines, col2X, blockStartY, col2W, "Dirección de envío");
     const endCol3 = drawColumn(clientLines, col3X, blockStartY, col3W, "Cliente");
 
-    y = Math.max(endCol1, endCol2, endCol3) + 8;
+    y = Math.max(endCol1, endCol3) + 8;
 
     // Separator line
     doc.setDrawColor(...LINE_COLOR);

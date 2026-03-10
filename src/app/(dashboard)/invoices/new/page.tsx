@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNotification } from "@/components/NotificationContext";
 import ServiceAutocomplete from "@/components/ServiceAutocomplete";
+import ClientModal from "@/components/ClientModal";
 
 interface Tax {
     id: string;
@@ -65,6 +66,7 @@ export default function NewInvoicePage() {
     const [publicNotes, setPublicNotes] = useState("");
     const [lines, setLines] = useState<LineItem[]>([emptyLine()]);
     const [saving, setSaving] = useState(false);
+    const [showClientModal, setShowClientModal] = useState(false);
 
     useEffect(() => {
         Promise.all([
@@ -197,7 +199,17 @@ export default function NewInvoicePage() {
                 <div className="card-body">
                     <div className="form-row">
                         <div className="form-group">
-                            <label className="form-label">Cliente *</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="form-label" style={{ marginBottom: 0 }}>Cliente *</label>
+                                <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => setShowClientModal(true)}
+                                    style={{ padding: '0 4px', fontSize: '11.5px', color: 'var(--color-primary)' }}
+                                >
+                                    + Nuevo Cliente
+                                </button>
+                            </div>
                             <select
                                 className="form-select"
                                 value={clientId}
@@ -383,6 +395,14 @@ export default function NewInvoicePage() {
                     Cancelar
                 </Link>
             </div>
+            <ClientModal
+                isOpen={showClientModal}
+                onClose={() => setShowClientModal(false)}
+                onSuccess={(client) => {
+                    setClients((prev) => [...prev, client]);
+                    setClientId(client.id);
+                }}
+            />
         </>
     );
 }
