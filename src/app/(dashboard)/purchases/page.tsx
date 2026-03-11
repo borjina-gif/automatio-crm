@@ -16,6 +16,7 @@ interface PurchaseInvoice {
     subtotalCents: number;
     taxCents: number;
     totalCents: number;
+    paidCents: number;
     provider: { id: string; name: string };
     createdAt: string;
 }
@@ -53,6 +54,8 @@ export default function PurchasesPage() {
     const [statusFilter, setStatusFilter] = useState("");
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [downloading, setDownloading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const { showConfirm } = useNotification();
@@ -150,6 +153,28 @@ export default function PurchasesPage() {
             if (res.ok) fetchPurchases();
         } catch { }
         setOpenDropdown(null);
+    }
+
+    async function handleBulkDownload() {
+        setDownloading(true);
+        try {
+            const res = await fetch("/api/purchases/bulk-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selected) }),
+            });
+            if (!res.ok) throw new Error("Error al descargar");
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const ct = res.headers.get("Content-Type") || "";
+            a.download = ct.includes("zip") ? `facturas-proveedor-${new Date().toISOString().slice(0, 10)}.zip` : "factura-proveedor.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) { console.error(err); } finally { setDownloading(false); }
     }
 
     return (
@@ -250,9 +275,171 @@ export default function PurchasesPage() {
                 <div className="bulk-action-bar">
                     <span className="bulk-count">{selected.size} seleccionada{selected.size !== 1 ? "s" : ""}</span>
                     <div className="bulk-divider" />
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowBulkModal(true)}>
+                        <span style={{ marginRight: 6 }}>💰</span> Añadir pago
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleBulkDownload} disabled={downloading}>
+                        {downloading ? "Descargando..." : "📥 Descargar PDFs"}
+                    </button>
                     <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set())}>✕ Deseleccionar</button>
                 </div>
             )}
+
+            {/* Bulk Payment Modal */}
+            {showBulkModal && (
+                <BulkPaymentModal
+                    purchases={purchases.filter(p => selected.has(p.id) && p.status === "BOOKED")}
+                    onClose={() => setShowBulkModal(false)}
+                    onSuccess={() => {
+                        setShowBulkModal(false);
+                        setSelected(new Set());
+                        fetchPurchases();
+                    }}
+                />
+            )}
         </>
+    );
+}
+
+// ── Bulk Payment Modal Component ───────────────────────────
+
+function BulkPaymentModal({ purchases, onClose, onSuccess }: { purchases: PurchaseInvoice[], onClose: () => void, onSuccess: () => void }) {
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(purchases.map(p => p.id)));
+    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+    const [selectedBankId, setSelectedBankId] = useState("");
+    const [paymentDate, setPaymentDate] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const { showError, showSuccess } = useNotification();
+
+    useEffect(() => {
+        fetch("/api/treasury/summary?period=month&year=" + new Date().getFullYear())
+            .then(r => r.json())
+            .then(d => {
+                if (d.accounts && Array.isArray(d.accounts)) setBankAccounts(d.accounts);
+            })
+            .catch(() => {});
+    }, []);
+
+    const toggleId = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    async function handleBulkPay() {
+        if (selectedIds.size === 0) return;
+        setSubmitting(true);
+        try {
+            for (const id of Array.from(selectedIds)) {
+                const res = await fetch(`/api/purchases/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "PAID" }),
+                });
+                if (!res.ok) throw new Error("Error al procesar la factura " + id);
+            }
+            showSuccess(`Se han marcado ${selectedIds.size} facturas como pagadas`);
+            onSuccess();
+        } catch (err: any) {
+            showError(err.message || "Error al procesar pagos");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, width: "90%" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <h2 style={{ margin: 0, fontSize: 20 }}>Pagar documentos</h2>
+                    <button className="btn btn-ghost" onClick={onClose}>✕</button>
+                </div>
+
+                <div className="table-container" style={{ maxHeight: 300, overflowY: "auto", marginBottom: 20, border: "1px solid var(--color-border)", borderRadius: 6 }}>
+                    <table className="data-table" style={{ margin: 0 }}>
+                        <thead style={{ position: "sticky", top: 0, background: "var(--color-bg)", zIndex: 1, borderBottom: "1px solid var(--color-border)" }}>
+                            <tr>
+                                <th className="cell-checkbox">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedIds.size === purchases.length && purchases.length > 0} 
+                                        onChange={() => {
+                                            if (selectedIds.size === purchases.length) setSelectedIds(new Set());
+                                            else setSelectedIds(new Set(purchases.map(p => p.id)));
+                                        }} 
+                                    />
+                                </th>
+                                <th>Tipo</th>
+                                <th>Num</th>
+                                <th>Descripción</th>
+                                <th className="text-right">Total</th>
+                                <th className="text-right">Pagado</th>
+                                <th className="text-right">Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {purchases.length === 0 ? (
+                                <tr><td colSpan={7} style={{ textAlign: "center", padding: 20 }}>No hay facturas contabilizadas válidas para pagar</td></tr>
+                            ) : null}
+                            {purchases.map(p => {
+                                const pending = p.totalCents - p.paidCents;
+                                const isChecked = selectedIds.has(p.id);
+                                return (
+                                    <tr key={p.id} style={{ opacity: isChecked ? 1 : 0.5 }}>
+                                        <td className="cell-checkbox">
+                                            <input type="checkbox" checked={isChecked} onChange={() => toggleId(p.id)} />
+                                        </td>
+                                        <td>Factura de compra</td>
+                                        <td className="cell-mono">{docNumber(p)}</td>
+                                        <td>
+                                            <div style={{ fontWeight: 500 }}>{p.provider.name}</div>
+                                            <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                                {p.providerInvoiceNumber ? `Nº ${p.providerInvoiceNumber}` : "Sin número proveedor"}
+                                            </div>
+                                        </td>
+                                        <td className="text-right cell-amount">{fmtCents(p.totalCents)}</td>
+                                        <td className="text-right cell-amount" style={{ color: "var(--color-success)" }}>{fmtCents(p.paidCents)}</td>
+                                        <td className="text-right cell-amount" style={{ color: "var(--color-primary)", fontWeight: 600 }}>{fmtCents(pending)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="form-row" style={{ marginBottom: 20 }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Banco</label>
+                        <select className="form-input" value={selectedBankId} onChange={(e) => setSelectedBankId(e.target.value)}>
+                            <option value="">No seleccionado</option>
+                            {bankAccounts.map(b => (
+                                <option key={b.id} value={b.id}>{b.name} {b.iban ? `(${b.iban})` : ""}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Fecha</label>
+                        <select className="form-input" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}>
+                            <option value="">Utilizar fecha del documento</option>
+                            <option value={new Date().toISOString().split("T")[0]}>Hoy ({new Date().toLocaleDateString("es-ES")})</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: 20 }}>
+                    <div style={{ fontSize: 14 }}>
+                        <span style={{ fontWeight: 600 }}>{selectedIds.size}</span> documento(s) seleccionado(s)
+                    </div>
+                    <div className="flex gap-2">
+                        <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancelar</button>
+                        <button className="btn btn-primary" onClick={handleBulkPay} disabled={submitting || selectedIds.size === 0}>
+                            {submitting ? "Procesando..." : "Añadir pagos"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

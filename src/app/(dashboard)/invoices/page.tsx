@@ -222,6 +222,7 @@ export default function InvoicesPage() {
     const [filter, setFilter] = useState("");
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [downloading, setDownloading] = useState(false);
+    const [showBulkModal, setShowBulkModal] = useState(false);
     const router = useRouter();
 
     // Date range — default to current year
@@ -285,6 +286,29 @@ export default function InvoicesPage() {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (err) { console.error(err); } finally { setDownloading(false); }
+    }
+
+    async function handleBulkSendEmail() {
+        const toSend = invoices.filter(i => selected.has(i.id) && ["ISSUED", "PARTIALLY_PAID", "PAID"].includes(i.status));
+        if (toSend.length === 0) {
+            alert("No hay facturas emitidas seleccionadas para enviar."); // Using simple alert to avoid context nesting issues, or showError if available
+            return;
+        }
+        if (!confirm(`¿Enviar ${toSend.length} factura(s) por email?`)) return;
+        setDownloading(true);
+        try {
+            let successCount = 0;
+            for (const inv of toSend) {
+                const res = await fetch(`/api/invoices/${inv.id}/send`, { method: "POST" });
+                if (res.ok) successCount++;
+            }
+            alert(`Emails enviados: ${successCount} de ${toSend.length}`);
+        } catch (err: any) {
+            console.error(err);
+        } finally {
+            setDownloading(false);
+            setSelected(new Set());
+        }
     }
 
     return (
@@ -388,12 +412,179 @@ export default function InvoicesPage() {
                 <div className="bulk-action-bar">
                     <span className="bulk-count">{selected.size} seleccionada{selected.size !== 1 ? "s" : ""}</span>
                     <div className="bulk-divider" />
-                    <button className="btn btn-primary btn-sm" onClick={handleBulkDownload} disabled={downloading}>
-                        {downloading ? "Descargando..." : "📥 Descargar PDFs"}
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowBulkModal(true)}>
+                        <span style={{ marginRight: 6 }}>💰</span> Añadir cobro
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleBulkSendEmail} disabled={downloading}>
+                        📧 Enviar
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={handleBulkDownload} disabled={downloading}>
+                        📥 Descargar PDFs
                     </button>
                     <button className="btn btn-secondary btn-sm" onClick={() => setSelected(new Set())}>✕ Deseleccionar</button>
                 </div>
             )}
+
+            {/* Bulk Payment Modal */}
+            {showBulkModal && (
+                <BulkPaymentModal
+                    invoices={invoices.filter(i => selected.has(i.id) && (i.status === "ISSUED" || i.status === "PARTIALLY_PAID" || i.status === "DRAFT"))}
+                    onClose={() => setShowBulkModal(false)}
+                    onSuccess={() => {
+                        setShowBulkModal(false);
+                        setSelected(new Set());
+                        fetchInvoices();
+                    }}
+                />
+            )}
         </>
+    );
+}
+
+// ── Bulk Payment Modal Component ───────────────────────────
+
+function BulkPaymentModal({ invoices, onClose, onSuccess }: { invoices: InvoiceItem[], onClose: () => void, onSuccess: () => void }) {
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(invoices.map(i => i.id)));
+    const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+    const [selectedBankId, setSelectedBankId] = useState("");
+    const [paymentDate, setPaymentDate] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const { showError, showSuccess } = useNotification();
+
+    useEffect(() => {
+        // Fetch bank accounts from treasury summary as a fallback to get accounts
+        fetch("/api/treasury/summary?period=month&year=" + new Date().getFullYear())
+            .then(r => r.json())
+            .then(d => {
+                if (d.accounts && Array.isArray(d.accounts)) setBankAccounts(d.accounts);
+            })
+            .catch(() => {});
+    }, []);
+
+    const toggleId = (id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    async function handleBulkPay() {
+        if (selectedIds.size === 0) return;
+        setSubmitting(true);
+        try {
+            // Process payments sequentially to avoid overwhelming
+            for (const id of Array.from(selectedIds)) {
+                // If a bank account / date was provided, a future API upgrade might use it. 
+                // For now, setting status = PAID handles the basic marking.
+                const res = await fetch(`/api/invoices/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "PAID" }),
+                });
+                if (!res.ok) throw new Error("Error al procesar la factura " + id);
+            }
+            showSuccess(`Se han marcado ${selectedIds.size} facturas como cobradas`);
+            onSuccess();
+        } catch (err: any) {
+            showError(err.message || "Error al procesar cobros");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    // Modal requires absolute positioning styles which are standard in this app
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, width: "90%" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <h2 style={{ margin: 0, fontSize: 20 }}>Cobrar documentos</h2>
+                    <button className="btn btn-ghost" onClick={onClose}>✕</button>
+                </div>
+
+                <div className="table-container" style={{ maxHeight: 300, overflowY: "auto", marginBottom: 20, border: "1px solid var(--color-border)", borderRadius: 6 }}>
+                    <table className="data-table" style={{ margin: 0 }}>
+                        <thead style={{ position: "sticky", top: 0, background: "var(--color-bg)", zIndex: 1, borderBottom: "1px solid var(--color-border)" }}>
+                            <tr>
+                                <th className="cell-checkbox">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={selectedIds.size === invoices.length && invoices.length > 0} 
+                                        onChange={() => {
+                                            if (selectedIds.size === invoices.length) setSelectedIds(new Set());
+                                            else setSelectedIds(new Set(invoices.map(i => i.id)));
+                                        }} 
+                                    />
+                                </th>
+                                <th>Tipo</th>
+                                <th>Num</th>
+                                <th>Descripción</th>
+                                <th className="text-right">Total</th>
+                                <th className="text-right">Pagado</th>
+                                <th className="text-right">Pendiente</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {invoices.length === 0 ? (
+                                <tr><td colSpan={7} style={{ textAlign: "center", padding: 20 }}>No hay documentos válidos para cobrar</td></tr>
+                            ) : null}
+                            {invoices.map(inv => {
+                                const pending = inv.totalCents - inv.paidCents;
+                                const isChecked = selectedIds.has(inv.id);
+                                return (
+                                    <tr key={inv.id} style={{ opacity: isChecked ? 1 : 0.5 }}>
+                                        <td className="cell-checkbox">
+                                            <input type="checkbox" checked={isChecked} onChange={() => toggleId(inv.id)} />
+                                        </td>
+                                        <td>Factura</td>
+                                        <td className="cell-mono">{inv.number || "Borrador"}</td>
+                                        <td>
+                                            <div style={{ fontWeight: 500 }}>{inv.client.name}</div>
+                                            <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                                {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString("es-ES") : "Sin fecha"}
+                                            </div>
+                                        </td>
+                                        <td className="text-right cell-amount">{formatCents(inv.totalCents)}</td>
+                                        <td className="text-right cell-amount" style={{ color: "var(--color-success)" }}>{formatCents(inv.paidCents)}</td>
+                                        <td className="text-right cell-amount" style={{ color: "var(--color-primary)", fontWeight: 600 }}>{formatCents(pending)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="form-row" style={{ marginBottom: 20 }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Banco</label>
+                        <select className="form-input" value={selectedBankId} onChange={(e) => setSelectedBankId(e.target.value)}>
+                            <option value="">No seleccionado</option>
+                            {bankAccounts.map(b => (
+                                <option key={b.id} value={b.id}>{b.name} {b.iban ? `(${b.iban})` : ""}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Fecha</label>
+                        <select className="form-input" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}>
+                            <option value="">Utilizar fecha del documento</option>
+                            <option value={new Date().toISOString().split("T")[0]}>Hoy ({new Date().toLocaleDateString("es-ES")})</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: 20 }}>
+                    <div style={{ fontSize: 14 }}>
+                        <span style={{ fontWeight: 600 }}>{selectedIds.size}</span> documento(s) seleccionado(s)
+                    </div>
+                    <div className="flex gap-2">
+                        <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancelar</button>
+                        <button className="btn btn-primary" onClick={handleBulkPay} disabled={submitting || selectedIds.size === 0}>
+                            {submitting ? "Procesando..." : "Añadir cobros"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
