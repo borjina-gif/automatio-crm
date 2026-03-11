@@ -29,6 +29,8 @@ export default function InvoiceDetailPage() {
     const [actionLoading, setActionLoading] = useState("");
     const [documents, setDocuments] = useState<any[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [showPartialModal, setShowPartialModal] = useState(false);
+    const [partialAmount, setPartialAmount] = useState("");
 
     useEffect(() => {
         fetch(`/api/invoices/${id}`)
@@ -99,6 +101,72 @@ export default function InvoiceDetailPage() {
         }
     }
 
+    async function handleMarkPaid() {
+        if (!await showConfirm("¿Marcar esta factura como cobrada?")) return;
+        setActionLoading("paid");
+        try {
+            const res = await fetch(`/api/invoices/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "PAID" }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            const updated = await res.json();
+            setInvoice(updated);
+            showSuccess("Factura marcada como cobrada");
+        } catch (err: any) {
+            showError(err.message);
+        } finally {
+            setActionLoading("");
+        }
+    }
+
+    async function handlePartialPayment() {
+        const cents = Math.round(parseFloat(partialAmount) * 100);
+        if (isNaN(cents) || cents <= 0) {
+            showError("Introduce un importe válido");
+            return;
+        }
+        setActionLoading("partial");
+        try {
+            const res = await fetch(`/api/invoices/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "PARTIALLY_PAID", paidCents: cents }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            const updated = await res.json();
+            setInvoice(updated);
+            showSuccess("Cobro parcial registrado");
+        } catch (err: any) {
+            showError(err.message);
+        } finally {
+            setActionLoading("");
+            setShowPartialModal(false);
+            setPartialAmount("");
+        }
+    }
+
+    async function handleVoid() {
+        if (!await showConfirm("¿Anular esta factura? Esta acción no se puede deshacer.")) return;
+        setActionLoading("void");
+        try {
+            const res = await fetch(`/api/invoices/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "VOID" }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            const updated = await res.json();
+            setInvoice(updated);
+            showSuccess("Factura anulada");
+        } catch (err: any) {
+            showError(err.message);
+        } finally {
+            setActionLoading("");
+        }
+    }
+
     async function handleDelete() {
         if (!await showConfirm("¿Eliminar esta factura?")) return;
         try {
@@ -127,7 +195,11 @@ export default function InvoiceDetailPage() {
     const st = STATUS_LABELS[invoice.status] || { label: invoice.status, class: "badge-draft" };
     const isDraft = invoice.status === "DRAFT";
     const isIssued = invoice.status === "ISSUED";
+    const isPartiallyPaid = invoice.status === "PARTIALLY_PAID";
     const hasNumber = !!invoice.number;
+    const canMarkPaid = isIssued || isPartiallyPaid;
+
+    const formatEur = (cents: number) => (cents / 100).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 
     return (
         <>
@@ -161,16 +233,39 @@ export default function InvoiceDetailPage() {
                     {/* ISSUED actions */}
                     {isIssued && (
                         <>
+                            <button onClick={handleMarkPaid} className="btn btn-primary" disabled={!!actionLoading}>
+                                {actionLoading === "paid" ? "Procesando..." : "💰 Marcar Cobrada"}
+                            </button>
+                            <button onClick={() => setShowPartialModal(true)} className="btn btn-secondary" disabled={!!actionLoading}>
+                                💳 Cobro Parcial
+                            </button>
                             <button onClick={handleDownloadPDF} className="btn btn-secondary" disabled={!!actionLoading}>
                                 {actionLoading === "pdf" ? "Generando..." : "📄 PDF"}
                             </button>
-                            <button onClick={handleSendEmail} className="btn btn-primary" disabled={!!actionLoading}>
+                            <button onClick={handleSendEmail} className="btn btn-secondary" disabled={!!actionLoading}>
                                 {actionLoading === "send" ? "Enviando..." : "📧 Enviar"}
+                            </button>
+                            <button onClick={handleVoid} className="btn btn-danger btn-sm" disabled={!!actionLoading}>
+                                🚫 Anular
                             </button>
                         </>
                     )}
-                    {/* PAID/PARTIALLY_PAID/VOID: just PDF */}
-                    {(invoice.status === "PAID" || invoice.status === "PARTIALLY_PAID" || invoice.status === "VOID") && hasNumber && (
+                    {/* PARTIALLY_PAID actions */}
+                    {isPartiallyPaid && (
+                        <>
+                            <button onClick={handleMarkPaid} className="btn btn-primary" disabled={!!actionLoading}>
+                                {actionLoading === "paid" ? "Procesando..." : "💰 Cobrar Resto"}
+                            </button>
+                            <button onClick={handleDownloadPDF} className="btn btn-secondary" disabled={!!actionLoading}>
+                                {actionLoading === "pdf" ? "Generando..." : "📄 PDF"}
+                            </button>
+                            <button onClick={handleVoid} className="btn btn-danger btn-sm" disabled={!!actionLoading}>
+                                🚫 Anular
+                            </button>
+                        </>
+                    )}
+                    {/* PAID/VOID: just PDF */}
+                    {(invoice.status === "PAID" || invoice.status === "VOID") && hasNumber && (
                         <button onClick={handleDownloadPDF} className="btn btn-secondary" disabled={!!actionLoading}>
                             📄 PDF
                         </button>
@@ -178,6 +273,45 @@ export default function InvoiceDetailPage() {
                     <Link href="/invoices" className="btn btn-ghost">← Volver</Link>
                 </div>
             </div>
+
+            {/* Partial Payment Modal */}
+            {showPartialModal && (
+                <div className="modal-overlay" onClick={() => setShowPartialModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>💳 Cobro Parcial</h3>
+                        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 4 }}>
+                            Total factura: {formatEur(invoice.totalCents)}
+                        </p>
+                        {invoice.paidCents > 0 && (
+                            <p style={{ fontSize: 13, color: "var(--color-success)", marginBottom: 4 }}>
+                                Ya cobrado: {formatEur(invoice.paidCents)}
+                            </p>
+                        )}
+                        <p style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12 }}>
+                            Pendiente: {formatEur(invoice.totalCents - invoice.paidCents)}
+                        </p>
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                            <label className="form-label">Importe cobrado (€)</label>
+                            <input
+                                type="number"
+                                className="form-input"
+                                value={partialAmount}
+                                onChange={(e) => setPartialAmount(e.target.value)}
+                                placeholder="0.00"
+                                min="0.01"
+                                step="0.01"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setShowPartialModal(false); setPartialAmount(""); }}>Cancelar</button>
+                            <button className="btn btn-primary btn-sm" onClick={handlePartialPayment} disabled={!!actionLoading}>
+                                {actionLoading === "partial" ? "Guardando..." : "Registrar cobro"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
 
 

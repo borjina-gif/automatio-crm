@@ -38,6 +38,8 @@ const STATUS_LABELS: Record<string, { label: string; class: string }> = {
 function ActionsDropdown({ invoice, onRefresh }: { invoice: InvoiceItem; onRefresh: () => void }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState("");
+    const [showPartialModal, setShowPartialModal] = useState(false);
+    const [partialAmount, setPartialAmount] = useState("");
     const ref = useRef<HTMLDivElement>(null);
     const { showConfirm, showSuccess, showError } = useNotification();
 
@@ -87,6 +89,55 @@ function ActionsDropdown({ invoice, onRefresh }: { invoice: InvoiceItem; onRefre
         } catch (err: any) { showError(err.message); } finally { setLoading(""); setOpen(false); }
     }
 
+    async function handleMarkPaid() {
+        if (!await showConfirm("¿Marcar esta factura como cobrada?")) return;
+        setLoading("paid");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "PAID" }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            showSuccess("Factura marcada como cobrada");
+            onRefresh();
+        } catch (err: any) { showError(err.message); } finally { setLoading(""); setOpen(false); }
+    }
+
+    async function handlePartialPayment() {
+        const cents = Math.round(parseFloat(partialAmount) * 100);
+        if (isNaN(cents) || cents <= 0) {
+            showError("Introduce un importe válido");
+            return;
+        }
+        setLoading("partial");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "PARTIALLY_PAID", paidCents: cents }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            showSuccess("Cobro parcial registrado");
+            onRefresh();
+        } catch (err: any) { showError(err.message); } finally { setLoading(""); setOpen(false); setShowPartialModal(false); setPartialAmount(""); }
+    }
+
+    async function handleVoid() {
+        if (!await showConfirm("¿Anular esta factura? Esta acción no se puede deshacer.")) return;
+        setLoading("void");
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "VOID" }),
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            showSuccess("Factura anulada");
+            onRefresh();
+        } catch (err: any) { showError(err.message); } finally { setLoading(""); setOpen(false); }
+    }
+
     async function handleDelete() {
         if (!await showConfirm("¿Eliminar esta factura?")) return;
         try {
@@ -98,26 +149,68 @@ function ActionsDropdown({ invoice, onRefresh }: { invoice: InvoiceItem; onRefre
 
     const isDraft = invoice.status === "DRAFT";
     const isIssued = invoice.status === "ISSUED";
+    const isPartial = invoice.status === "PARTIALLY_PAID";
+    const canMarkPaid = isIssued || isPartial;
 
     return (
-        <div className="actions-dropdown" ref={ref}>
-            <button className="btn btn-ghost btn-sm actions-dropdown-trigger" onClick={(e) => { e.stopPropagation(); setOpen(!open); }} disabled={!!loading}>
-                {loading ? <span className="spinner-sm" /> : "⋯"}
-            </button>
-            {open && (
-                <div className="actions-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                    <Link href={`/invoices/${invoice.id}`} className="actions-dropdown-item">👁️ Ver detalle</Link>
-                    <button className="actions-dropdown-item" onClick={handleDownloadPDF}>📄 Descargar PDF</button>
-                    <div className="actions-dropdown-divider" />
-                    {isDraft && (<>
-                        <button className="actions-dropdown-item" onClick={handleEmit}>📋 Emitir</button>
+        <>
+            <div className="actions-dropdown" ref={ref}>
+                <button className="btn btn-ghost btn-sm actions-dropdown-trigger" onClick={(e) => { e.stopPropagation(); setOpen(!open); }} disabled={!!loading}>
+                    {loading ? <span className="spinner-sm" /> : "⋯"}
+                </button>
+                {open && (
+                    <div className="actions-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                        <Link href={`/invoices/${invoice.id}`} className="actions-dropdown-item">👁️ Ver detalle</Link>
+                        <button className="actions-dropdown-item" onClick={handleDownloadPDF}>📄 Descargar PDF</button>
                         <div className="actions-dropdown-divider" />
-                        <button className="actions-dropdown-item actions-dropdown-danger" onClick={handleDelete}>🗑️ Eliminar</button>
-                    </>)}
-                    {isIssued && <button className="actions-dropdown-item" onClick={handleSendEmail}>📧 Enviar email</button>}
+                        {isDraft && (<>
+                            <button className="actions-dropdown-item" onClick={handleEmit}>📋 Emitir</button>
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item actions-dropdown-danger" onClick={handleDelete}>🗑️ Eliminar</button>
+                        </>)}
+                        {isIssued && <button className="actions-dropdown-item" onClick={handleSendEmail}>📧 Enviar email</button>}
+                        {canMarkPaid && (<>
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item" onClick={handleMarkPaid}>💰 Marcar Cobrada</button>
+                            {isIssued && <button className="actions-dropdown-item" onClick={() => { setShowPartialModal(true); setOpen(false); }}>💳 Cobro Parcial</button>}
+                            <div className="actions-dropdown-divider" />
+                            <button className="actions-dropdown-item actions-dropdown-danger" onClick={handleVoid}>🚫 Anular</button>
+                        </>)}
+                    </div>
+                )}
+            </div>
+
+            {/* Partial Payment Modal */}
+            {showPartialModal && (
+                <div className="modal-overlay" onClick={(e) => { e.stopPropagation(); setShowPartialModal(false); }}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>💳 Cobro Parcial</h3>
+                        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 12 }}>
+                            Total factura: {formatCents(invoice.totalCents)}
+                        </p>
+                        <div className="form-group" style={{ marginBottom: 16 }}>
+                            <label className="form-label">Importe cobrado (€)</label>
+                            <input
+                                type="number"
+                                className="form-input"
+                                value={partialAmount}
+                                onChange={(e) => setPartialAmount(e.target.value)}
+                                placeholder="0.00"
+                                min="0.01"
+                                step="0.01"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-2" style={{ justifyContent: "flex-end" }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setShowPartialModal(false); setPartialAmount(""); }}>Cancelar</button>
+                            <button className="btn btn-primary btn-sm" onClick={handlePartialPayment} disabled={!!loading}>
+                                {loading === "partial" ? "Guardando..." : "Registrar cobro"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
