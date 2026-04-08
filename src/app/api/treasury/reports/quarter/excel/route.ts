@@ -119,25 +119,25 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
     // ── Sales detail sheet ──────────────────────────────
     if (report.sales.rows.length > 0) {
         const salesSheet = workbook.addWorksheet("Ventas");
-        salesSheet.addRow(["Número", "Cliente", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"]);
+        salesSheet.addRow(["Número", "Cliente", "NIF/CIF", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"]);
         salesSheet.getRow(1).eachCell((cell) => {
             Object.assign(cell, { style: headerStyle });
         });
         report.sales.rows.forEach((r) => {
-            salesSheet.addRow([r.number, r.counterpartyName, r.issueDate, r.subtotalCents / 100, r.taxCents / 100, r.totalCents / 100, r.status]);
+            salesSheet.addRow([r.number, r.counterpartyName, r.counterpartyTaxId, r.issueDate, r.subtotalCents / 100, r.taxCents / 100, r.totalCents / 100, r.status]);
         });
         // Totals row
-        salesSheet.addRow(["", "TOTAL", "", report.sales.subtotalCents / 100, report.sales.taxCents / 100, report.sales.totalCents / 100, ""]);
+        salesSheet.addRow(["", "TOTAL", "", "", report.sales.subtotalCents / 100, report.sales.taxCents / 100, report.sales.totalCents / 100, ""]);
         const lastRow = salesSheet.lastRow;
         lastRow?.eachCell((cell) => { cell.font = { bold: true }; });
 
-        [1, 2, 3, 4, 5, 6, 7].forEach((col, i) => {
-            salesSheet.getColumn(col).width = [14, 30, 12, 14, 14, 14, 12][i];
+        [1, 2, 3, 4, 5, 6, 7, 8].forEach((col, i) => {
+            salesSheet.getColumn(col).width = [14, 30, 16, 12, 14, 14, 14, 12][i];
         });
 
         // Currency format
         for (let row = 2; row <= salesSheet.rowCount; row++) {
-            for (const col of [4, 5, 6]) {
+            for (const col of [5, 6, 7]) {
                 const cell = salesSheet.getCell(row, col);
                 if (typeof cell.value === "number") cell.numFmt = '#,##0.00 €';
             }
@@ -147,23 +147,23 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
     // ── Purchases detail sheet ──────────────────────────
     if (report.purchases.rows.length > 0) {
         const purchSheet = workbook.addWorksheet("Compras");
-        purchSheet.addRow(["Número", "Proveedor", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"]);
+        purchSheet.addRow(["Número", "Proveedor", "NIF/CIF", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"]);
         purchSheet.getRow(1).eachCell((cell) => {
             Object.assign(cell, { style: headerStyle });
         });
         report.purchases.rows.forEach((r) => {
-            purchSheet.addRow([r.number, r.counterpartyName, r.issueDate, r.subtotalCents / 100, r.taxCents / 100, r.totalCents / 100, r.status]);
+            purchSheet.addRow([r.number, r.counterpartyName, r.counterpartyTaxId, r.issueDate, r.subtotalCents / 100, r.taxCents / 100, r.totalCents / 100, r.status]);
         });
-        purchSheet.addRow(["", "TOTAL", "", report.purchases.subtotalCents / 100, report.purchases.taxCents / 100, report.purchases.totalCents / 100, ""]);
+        purchSheet.addRow(["", "TOTAL", "", "", report.purchases.subtotalCents / 100, report.purchases.taxCents / 100, report.purchases.totalCents / 100, ""]);
         const lastRow = purchSheet.lastRow;
         lastRow?.eachCell((cell) => { cell.font = { bold: true }; });
 
-        [1, 2, 3, 4, 5, 6, 7].forEach((col, i) => {
-            purchSheet.getColumn(col).width = [14, 30, 12, 14, 14, 14, 12][i];
+        [1, 2, 3, 4, 5, 6, 7, 8].forEach((col, i) => {
+            purchSheet.getColumn(col).width = [14, 30, 16, 12, 14, 14, 14, 12][i];
         });
 
         for (let row = 2; row <= purchSheet.rowCount; row++) {
-            for (const col of [4, 5, 6]) {
+            for (const col of [5, 6, 7]) {
                 const cell = purchSheet.getCell(row, col);
                 if (typeof cell.value === "number") cell.numFmt = '#,##0.00 €';
             }

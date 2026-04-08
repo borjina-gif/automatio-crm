@@ -32,6 +32,7 @@ export interface InvoiceSummaryRow {
     id: string;
     number: string;
     counterpartyName: string;
+    counterpartyTaxId: string;
     issueDate: string;
     subtotalCents: number;
     taxCents: number;
@@ -135,7 +136,7 @@ export async function buildQuarterlyReport(
                 issueDate: { gte: range.from, lte: range.to },
             },
             include: {
-                client: { select: { name: true } },
+                client: { select: { name: true, taxId: true } },
                 lines: { include: { tax: true } },
             },
             orderBy: { issueDate: "asc" },
@@ -145,6 +146,7 @@ export async function buildQuarterlyReport(
             id: inv.id,
             number: inv.number || "BORRADOR",
             counterpartyName: inv.client?.name || "—",
+            counterpartyTaxId: inv.client?.taxId || "—",
             issueDate: inv.issueDate?.toISOString().split("T")[0] || "—",
             subtotalCents: inv.subtotalCents,
             taxCents: inv.taxCents,
@@ -208,7 +210,7 @@ export async function buildQuarterlyReport(
                 issueDate: { gte: range.from, lte: range.to },
             },
             include: {
-                provider: { select: { name: true } },
+                provider: { select: { name: true, taxId: true } },
                 lines: { include: { tax: true } },
             },
             orderBy: { issueDate: "asc" },
@@ -220,6 +222,7 @@ export async function buildQuarterlyReport(
                 ? `FP-${p.year}-${String(p.number).padStart(4, "0")}`
                 : "BORRADOR",
             counterpartyName: p.provider?.name || "—",
+            counterpartyTaxId: p.provider?.taxId || "—",
             issueDate: p.issueDate?.toISOString().split("T")[0] || "—",
             subtotalCents: p.subtotalCents,
             taxCents: p.taxCents,
@@ -296,7 +299,7 @@ export function fmtCents(cents: number): string {
 }
 
 export function reportToCSVRows(report: QuarterlyReport): string[][] {
-    const headers = ["Tipo", "Número", "Contrapartida", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"];
+    const headers = ["Tipo", "Número", "Contrapartida", "NIF/CIF", "Fecha", "Base (€)", "IVA (€)", "Total (€)", "Estado"];
     const rows: string[][] = [headers];
 
     report.sales.rows.forEach((r) => {
@@ -304,6 +307,7 @@ export function reportToCSVRows(report: QuarterlyReport): string[][] {
             "Venta",
             r.number,
             r.counterpartyName,
+            r.counterpartyTaxId,
             r.issueDate,
             fmtCents(r.subtotalCents),
             fmtCents(r.taxCents),
@@ -317,6 +321,7 @@ export function reportToCSVRows(report: QuarterlyReport): string[][] {
             "Compra",
             r.number,
             r.counterpartyName,
+            r.counterpartyTaxId,
             r.issueDate,
             fmtCents(r.subtotalCents),
             fmtCents(r.taxCents),

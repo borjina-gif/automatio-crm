@@ -215,21 +215,22 @@ function generateReportPDF(report: QuarterlyReport): Buffer {
         startY += 7;
 
         // Table headers
-        doc.setFontSize(7.5);
+        doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...LIGHT);
         doc.text("NÚMERO", marginLeft, startY);
-        doc.text("CONTRAPARTIDA", marginLeft + 28, startY);
-        doc.text("FECHA", marginLeft + 85, startY);
-        doc.text("BASE", marginLeft + 110, startY, { align: "right" });
-        doc.text("IVA", marginLeft + 130, startY, { align: "right" });
+        doc.text("CONTRAPARTIDA", marginLeft + 22, startY);
+        doc.text("NIF/CIF", marginLeft + 68, startY);
+        doc.text("FECHA", marginLeft + 92, startY);
+        doc.text("BASE", marginLeft + 120, startY, { align: "right" });
+        doc.text("IVA", marginLeft + 140, startY, { align: "right" });
         doc.text("TOTAL", rightEdge, startY, { align: "right" });
         startY += 3;
         doc.setDrawColor(...LINE);
         doc.line(marginLeft, startY, rightEdge, startY);
         startY += 5;
 
-        doc.setFontSize(8.5);
+        doc.setFontSize(7.5);
         rows.forEach((row) => {
             if (startY + 6 > pageHeight - 15) {
                 doc.addPage();
@@ -238,10 +239,11 @@ function generateReportPDF(report: QuarterlyReport): Buffer {
             doc.setFont("helvetica", "normal");
             doc.setTextColor(...DARK);
             doc.text(row.number, marginLeft, startY);
-            doc.text(row.counterpartyName.substring(0, 30), marginLeft + 28, startY);
-            doc.text(row.issueDate, marginLeft + 85, startY);
-            doc.text(`${fmtCents(row.subtotalCents)}`, marginLeft + 110, startY, { align: "right" });
-            doc.text(`${fmtCents(row.taxCents)}`, marginLeft + 130, startY, { align: "right" });
+            doc.text(row.counterpartyName.substring(0, 24), marginLeft + 22, startY);
+            doc.text(row.counterpartyTaxId.substring(0, 14), marginLeft + 68, startY);
+            doc.text(row.issueDate, marginLeft + 92, startY);
+            doc.text(`${fmtCents(row.subtotalCents)}`, marginLeft + 120, startY, { align: "right" });
+            doc.text(`${fmtCents(row.taxCents)}`, marginLeft + 140, startY, { align: "right" });
             doc.text(`${fmtCents(row.totalCents)}`, rightEdge, startY, { align: "right" });
             startY += 5;
         });
