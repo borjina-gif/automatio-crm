@@ -38,9 +38,43 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
     // ── Summary sheet ───────────────────────────────────
     const summarySheet = workbook.addWorksheet("Resumen");
 
-    // Title
+    const labelStyle: Partial<ExcelJS.Style> = {
+        font: { bold: true, color: { argb: "FF333333" } },
+    };
+
+    // ── Company fiscal data block ────────────────────────
     summarySheet.mergeCells("A1:D1");
-    const titleCell = summarySheet.getCell("A1");
+    const fiscalTitleCell = summarySheet.getCell("A1");
+    fiscalTitleCell.value = "Datos Fiscales de la Empresa";
+    fiscalTitleCell.font = { bold: true, size: 13, color: { argb: "FF1B1660" } };
+    fiscalTitleCell.alignment = { horizontal: "left" };
+
+    const c = report.company;
+    // Build full address string
+    const addressParts = [c.addressLine1, c.addressLine2].filter(Boolean);
+    const locationParts = [c.postalCode, c.city, c.province].filter(Boolean);
+    const fullAddress = [...addressParts, locationParts.join(" "), c.country].filter(Boolean).join(", ");
+
+    const fiscalRows: [string, string][] = [
+        ["Razón social", c.legalName],
+        ["Nombre comercial", c.tradeName || "—"],
+        ["NIF / CIF", c.taxId || "—"],
+        ["Dirección fiscal", fullAddress || "—"],
+        ["Email", c.email || "—"],
+        ["Teléfono", c.phone || "—"],
+    ];
+
+    fiscalRows.forEach(([label, value]) => {
+        const row = summarySheet.addRow([label, value]);
+        row.getCell(1).style = labelStyle;
+    });
+
+    summarySheet.addRow([]); // blank separator
+
+    // ── Report title ─────────────────────────────────────
+    const titleRowNum = summarySheet.rowCount + 1;
+    summarySheet.mergeCells(`A${titleRowNum}:D${titleRowNum}`);
+    const titleCell = summarySheet.getCell(`A${titleRowNum}`);
     titleCell.value = `Informe Trimestral ${report.label}`;
     titleCell.font = { bold: true, size: 16 };
     titleCell.alignment = { horizontal: "center" };
@@ -54,8 +88,9 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
         alignment: { horizontal: "center" },
     };
 
-    summarySheet.addRow(["", "Ventas", "Compras", "Diferencia"]);
-    summarySheet.getRow(3).eachCell((cell) => {
+    const summaryHeaderRow = summarySheet.addRow(["", "Ventas", "Compras", "Diferencia"]);
+    const summaryHeaderRowNum = summaryHeaderRow.number;
+    summarySheet.getRow(summaryHeaderRowNum).eachCell((cell) => {
         Object.assign(cell, { style: headerStyle });
     });
 
@@ -65,8 +100,8 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
     summarySheet.addRow(["Total", report.sales.totalCents / 100, report.purchases.totalCents / 100, (report.sales.totalCents - report.purchases.totalCents) / 100]);
     summarySheet.addRow(["Ticket medio", report.sales.averageTicketCents / 100, report.purchases.averageTicketCents / 100, ""]);
 
-    // Format currency columns
-    for (let row = 4; row <= 8; row++) {
+    // Format currency columns (data rows are from summaryHeaderRowNum+1 to summaryHeaderRowNum+5)
+    for (let row = summaryHeaderRowNum + 1; row <= summaryHeaderRowNum + 5; row++) {
         for (let col = 2; col <= 4; col++) {
             const cell = summarySheet.getCell(row, col);
             if (typeof cell.value === "number") {
@@ -76,7 +111,7 @@ async function generateExcel(report: QuarterlyReport): Promise<Buffer> {
     }
 
     // Column widths
-    summarySheet.getColumn(1).width = 20;
+    summarySheet.getColumn(1).width = 22;
     summarySheet.getColumn(2).width = 18;
     summarySheet.getColumn(3).width = 18;
     summarySheet.getColumn(4).width = 18;

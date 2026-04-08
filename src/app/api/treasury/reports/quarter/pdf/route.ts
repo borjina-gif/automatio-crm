@@ -70,6 +70,41 @@ function generateReportPDF(report: QuarterlyReport): Buffer {
     doc.line(marginLeft, y, rightEdge, y);
     y += 8;
 
+    // ── Company Fiscal Data ──
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...NAVY);
+    doc.text("Datos Fiscales", marginLeft, y);
+    y += 6;
+
+    const company = report.company;
+    const addressParts = [company.addressLine1, company.addressLine2].filter(Boolean);
+    const locationParts = [company.postalCode, company.city, company.province].filter(Boolean);
+    const fullAddress = [...addressParts, locationParts.join(" "), company.country].filter(Boolean).join(", ");
+
+    const fiscalLines: [string, string][] = [
+        ["Razón social:", company.legalName],
+        ["NIF / CIF:", company.taxId || "—"],
+        ["Dirección:", fullAddress || "—"],
+        ["Email:", company.email || "—"],
+        ["Teléfono:", company.phone || "—"],
+    ];
+
+    doc.setFontSize(8.5);
+    fiscalLines.forEach(([label, value]) => {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...DARK);
+        doc.text(label, marginLeft, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(value, marginLeft + 30, y);
+        y += 5;
+    });
+
+    y += 3;
+    doc.setDrawColor(...LINE);
+    doc.line(marginLeft, y, rightEdge, y);
+    y += 8;
+
     // ── Executive Summary ──
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");

@@ -7,6 +7,20 @@ import { prisma } from "@/lib/prisma";
 
 // ─── TYPES ──────────────────────────────────────────────────
 
+export interface CompanyFiscalData {
+    legalName: string;
+    tradeName: string | null;
+    taxId: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    postalCode: string | null;
+    province: string | null;
+    country: string;
+    email: string | null;
+    phone: string | null;
+}
+
 export interface QuarterRange {
     year: number;
     quarter: number; // 1-4
@@ -40,6 +54,7 @@ export interface QuarterlyReport {
     from: string;
     to: string;
     type: "sales" | "purchases" | "all";
+    company: CompanyFiscalData;
     sales: {
         count: number;
         subtotalCents: number;
@@ -80,6 +95,22 @@ export async function buildQuarterlyReport(
     type: "sales" | "purchases" | "all"
 ): Promise<QuarterlyReport> {
     const range = getQuarterRange(year, quarter);
+
+    // Fetch company fiscal data
+    const companyRecord = await prisma.company.findFirst();
+    const companyData: CompanyFiscalData = {
+        legalName: companyRecord?.legalName || "—",
+        tradeName: companyRecord?.tradeName || null,
+        taxId: companyRecord?.taxId || null,
+        addressLine1: companyRecord?.addressLine1 || null,
+        addressLine2: companyRecord?.addressLine2 || null,
+        city: companyRecord?.city || null,
+        postalCode: companyRecord?.postalCode || null,
+        province: companyRecord?.province || null,
+        country: companyRecord?.country || "ES",
+        email: companyRecord?.email || null,
+        phone: companyRecord?.phone || null,
+    };
 
     const emptySide = {
         count: 0,
@@ -248,6 +279,7 @@ export async function buildQuarterlyReport(
         from: range.from.toISOString().split("T")[0],
         to: range.to.toISOString().split("T")[0],
         type,
+        company: companyData,
         sales: salesData,
         purchases: purchasesData,
         ivaDifferenceCents: salesData.taxCents - purchasesData.taxCents,
