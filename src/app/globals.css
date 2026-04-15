@@ -328,6 +328,39 @@ textarea {
     gap: 8px;
 }
 
+.topbar-search-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+    min-width: 200px;
+}
+
+.topbar-search-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text-secondary);
+    box-shadow: 0 0 0 3px var(--color-primary-muted);
+}
+
+.topbar-search-btn kbd {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    margin-left: auto;
+}
+
 .page-content {
     flex: 1;
     padding: 28px;

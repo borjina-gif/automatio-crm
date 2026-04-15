@@ -21,6 +21,20 @@ interface Client {
     createdAt: string;
 }
 
+interface ClientSummary {
+    totalInvoiced: number;
+    totalPaid: number;
+    pendingBalance: number;
+    overdueAmount: number;
+    overdueCount: number;
+    invoiceCount: number;
+    averageTicket: number;
+    quoteCount: number;
+    acceptedQuotes: number;
+    conversionRate: number;
+    lastInvoiceDate: string | null;
+}
+
 interface HistoryItem {
     id: string;
     number: string | null;
@@ -32,11 +46,13 @@ interface HistoryItem {
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
     DRAFT: { label: "Borrador", cls: "badge-draft" },
-    ISSUED: { label: "Emitida", cls: "badge-success" },
+    ISSUED: { label: "Emitida", cls: "badge-info" },
     SENT: { label: "Enviada", cls: "badge-info" },
     ACCEPTED: { label: "Aceptado", cls: "badge-success" },
     REJECTED: { label: "Rechazado", cls: "badge-danger" },
     PAID: { label: "Pagada", cls: "badge-success" },
+    PARTIALLY_PAID: { label: "Parcial", cls: "badge-warning" },
+    VOID: { label: "Anulada", cls: "badge-danger" },
     OVERDUE: { label: "Vencida", cls: "badge-warning" },
 };
 
@@ -53,15 +69,16 @@ export default function ClientDetailPage() {
     const router = useRouter();
     const { showError, showConfirm } = useNotification();
     const [client, setClient] = useState<Client | null>(null);
+    const [summary, setSummary] = useState<ClientSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [tab, setTab] = useState<"datos" | "historial">("datos");
+    const [tab, setTab] = useState<"resumen" | "datos" | "facturas" | "presupuestos">("resumen");
     const [invoices, setInvoices] = useState<HistoryItem[]>([]);
     const [quotes, setQuotes] = useState<HistoryItem[]>([]);
     const [histLoading, setHistLoading] = useState(false);
 
-    useEffect(() => { fetchClient(); }, [id]);
+    useEffect(() => { fetchClient(); fetchSummary(); }, [id]);
 
     async function fetchClient() {
         try {
@@ -74,6 +91,13 @@ export default function ClientDetailPage() {
         } finally {
             setLoading(false);
         }
+    }
+
+    async function fetchSummary() {
+        try {
+            const res = await fetch(`/api/clients/${id}/summary`);
+            if (res.ok) setSummary(await res.json());
+        } catch { /* ignore */ }
     }
 
     async function fetchHistory() {
@@ -152,6 +176,13 @@ export default function ClientDetailPage() {
         );
     }
 
+    const tabs = [
+        { key: "resumen", label: "📊 Resumen", onClick: () => setTab("resumen") },
+        { key: "datos", label: "📋 Datos", onClick: () => setTab("datos") },
+        { key: "facturas", label: "📄 Facturas", onClick: () => { setTab("facturas"); fetchHistory(); } },
+        { key: "presupuestos", label: "📝 Presupuestos", onClick: () => { setTab("presupuestos"); fetchHistory(); } },
+    ];
+
     return (
         <>
             <div className="page-header">
@@ -181,25 +212,152 @@ export default function ClientDetailPage() {
                 </div>
             </div>
 
-
-
             {/* ── Tab Switcher ── */}
-            <div className="detail-tabs" style={{ display: "flex", gap: 0, marginBottom: 20 }}>
-                <button
-                    className={`btn ${tab === "datos" ? "btn-primary" : "btn-secondary"}`}
-                    onClick={() => setTab("datos")}
-                    style={{ borderRadius: "8px 0 0 8px" }}
-                >
-                    📋 Datos
-                </button>
-                <button
-                    className={`btn ${tab === "historial" ? "btn-primary" : "btn-secondary"}`}
-                    onClick={() => { setTab("historial"); fetchHistory(); }}
-                    style={{ borderRadius: "0 8px 8px 0" }}
-                >
-                    📊 Historial
-                </button>
+            <div style={{ display: "flex", gap: 0, marginBottom: 20 }}>
+                {tabs.map((t, idx) => (
+                    <button
+                        key={t.key}
+                        className={`btn ${tab === t.key ? "btn-primary" : "btn-secondary"}`}
+                        onClick={t.onClick}
+                        style={{
+                            borderRadius: idx === 0 ? "8px 0 0 8px" : idx === tabs.length - 1 ? "0 8px 8px 0" : 0,
+                            borderRight: idx < tabs.length - 1 ? "none" : undefined,
+                        }}
+                    >
+                        {t.label}
+                    </button>
+                ))}
             </div>
+
+            {/* ── Tab: Resumen 360° ── */}
+            {tab === "resumen" && summary && (
+                <>
+                    {/* KPI Cards */}
+                    <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 20 }}>
+                        <div className="stat-card">
+                            <div className="stat-label">Total Facturado</div>
+                            <div className="stat-value" style={{ color: "var(--color-success)" }}>{fmtCents(summary.totalInvoiced)} €</div>
+                            <div className="stat-sub">{summary.invoiceCount} facturas</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">Pendiente de Cobro</div>
+                            <div className="stat-value" style={{ color: summary.pendingBalance > 0 ? "var(--color-warning)" : "var(--color-success)" }}>
+                                {fmtCents(summary.pendingBalance)} €
+                            </div>
+                            <div className="stat-sub">
+                                {summary.overdueCount > 0 && (
+                                    <span style={{ color: "var(--color-danger)", fontWeight: 600 }}>
+                                        ⚠️ {summary.overdueCount} vencida{summary.overdueCount !== 1 ? "s" : ""}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">Ticket Medio</div>
+                            <div className="stat-value">{fmtCents(summary.averageTicket)} €</div>
+                            <div className="stat-sub">Por factura</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-label">Conversión</div>
+                            <div className="stat-value">{summary.conversionRate}%</div>
+                            <div className="stat-sub">{summary.acceptedQuotes}/{summary.quoteCount} presupuestos</div>
+                        </div>
+                    </div>
+
+                    {/* Details Card */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        <div className="card">
+                            <div className="card-header">
+                                <span className="card-title">💰 Desglose Financiero</span>
+                            </div>
+                            <div className="card-body">
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Total facturado</span>
+                                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-text)" }}>{fmtCents(summary.totalInvoiced)} €</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Total cobrado</span>
+                                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-success)" }}>{fmtCents(summary.totalPaid)} €</span>
+                                    </div>
+                                    <div style={{ borderTop: "1px solid var(--color-border-subtle)", paddingTop: 12 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Pendiente</span>
+                                            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: summary.pendingBalance > 0 ? "var(--color-warning)" : "var(--color-success)" }}>{fmtCents(summary.pendingBalance)} €</span>
+                                        </div>
+                                    </div>
+                                    {summary.overdueAmount > 0 && (
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <span style={{ fontSize: 13, color: "var(--color-danger)" }}>⚠️ Vencido</span>
+                                            <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-danger)" }}>{fmtCents(summary.overdueAmount)} €</span>
+                                        </div>
+                                    )}
+                                    {/* Payment progress bar */}
+                                    {summary.totalInvoiced > 0 && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                                                <span>Cobrado</span>
+                                                <span>{Math.round((summary.totalPaid / summary.totalInvoiced) * 100)}%</span>
+                                            </div>
+                                            <div style={{ width: "100%", height: 6, background: "var(--color-border)", borderRadius: 3, overflow: "hidden" }}>
+                                                <div style={{
+                                                    height: "100%",
+                                                    width: `${Math.min((summary.totalPaid / summary.totalInvoiced) * 100, 100)}%`,
+                                                    background: "var(--color-success)",
+                                                    borderRadius: 3,
+                                                    transition: "width 0.5s ease",
+                                                }} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="card">
+                            <div className="card-header">
+                                <span className="card-title">📋 Información Rápida</span>
+                            </div>
+                            <div className="card-body">
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>NIF/CIF</span>
+                                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{client.taxId || "—"}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Email</span>
+                                        <span>{client.email || "—"}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Teléfono</span>
+                                        <span>{client.phone || "—"}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Ciudad</span>
+                                        <span>{client.billingCity || "—"}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Plazo de pago</span>
+                                        <span>{client.paymentTermsDays} días</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Última factura</span>
+                                        <span>{fmtDate(summary.lastInvoiceDate)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Cliente desde</span>
+                                        <span>{fmtDate(client.createdAt)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {tab === "resumen" && !summary && (
+                <div className="loading-center"><div className="spinner" /></div>
+            )}
 
             {/* ── Tab: Datos ── */}
             {tab === "datos" && (
@@ -314,101 +472,96 @@ export default function ClientDetailPage() {
                 </div>
             )}
 
-            {/* ── Tab: Historial ── */}
-            {tab === "historial" && (
+            {/* ── Tab: Facturas ── */}
+            {tab === "facturas" && (
                 <div>
-                    {/* Counter badges */}
                     <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
                         <span className="badge badge-primary">{invoices.length} facturas</span>
-                        <span className="badge badge-info">{quotes.length} presupuestos</span>
                     </div>
-
                     {histLoading ? (
                         <div className="loading-center"><div className="spinner" /></div>
+                    ) : invoices.length === 0 ? (
+                        <div className="card"><div className="card-body"><p style={{ color: "var(--color-text-muted)" }}>Sin facturas</p></div></div>
                     ) : (
-                        <>
-                            {/* Invoices */}
-                            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>📄 Facturas</h3>
-                            {invoices.length === 0 ? (
-                                <div className="card" style={{ marginBottom: 24 }}><div className="card-body"><p style={{ color: "var(--color-text-muted)" }}>Sin facturas</p></div></div>
-                            ) : (
-                                <div className="table-container" style={{ marginBottom: 24 }}>
-                                    <div style={{ overflowX: "auto" }}>
-                                        <table className="data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Fecha</th>
-                                                    <th>Nº Documento</th>
-                                                    <th>Estado</th>
-                                                    <th style={{ textAlign: "right" }}>Total</th>
-                                                    <th>Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {invoices.map((inv) => {
-                                                    const st = STATUS_MAP[inv.status] || { label: inv.status, cls: "badge-draft" };
-                                                    return (
-                                                        <tr key={inv.id}>
-                                                            <td>{fmtDate(inv.issueDate)}</td>
-                                                            <td className="cell-primary">{inv.number || "Borrador"}</td>
-                                                            <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
-                                                            <td className="cell-amount">{fmtCents(inv.totalCents)}€</td>
-                                                            <td>
-                                                                <div style={{ display: "flex", gap: 6 }}>
-                                                                    <Link href={`/invoices/${inv.id}`} className="btn btn-ghost btn-sm">Ver</Link>
-                                                                    <a href={`/api/invoices/${inv.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">PDF</a>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
+                        <div className="table-container">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Nº Documento</th>
+                                        <th>Estado</th>
+                                        <th style={{ textAlign: "right" }}>Total</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {invoices.map((inv) => {
+                                        const st = STATUS_MAP[inv.status] || { label: inv.status, cls: "badge-draft" };
+                                        return (
+                                            <tr key={inv.id}>
+                                                <td>{fmtDate(inv.issueDate)}</td>
+                                                <td className="cell-primary">{inv.number || "Borrador"}</td>
+                                                <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
+                                                <td className="cell-amount">{fmtCents(inv.totalCents)} €</td>
+                                                <td>
+                                                    <div style={{ display: "flex", gap: 6 }}>
+                                                        <Link href={`/invoices/${inv.id}`} className="btn btn-ghost btn-sm">Ver</Link>
+                                                        <a href={`/api/invoices/${inv.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">PDF</a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
 
-                            {/* Quotes */}
-                            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>📝 Presupuestos</h3>
-                            {quotes.length === 0 ? (
-                                <div className="card"><div className="card-body"><p style={{ color: "var(--color-text-muted)" }}>Sin presupuestos</p></div></div>
-                            ) : (
-                                <div className="table-container">
-                                    <div style={{ overflowX: "auto" }}>
-                                        <table className="data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Fecha</th>
-                                                    <th>Nº Documento</th>
-                                                    <th>Estado</th>
-                                                    <th style={{ textAlign: "right" }}>Total</th>
-                                                    <th>Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {quotes.map((q) => {
-                                                    const st = STATUS_MAP[q.status] || { label: q.status, cls: "badge-draft" };
-                                                    return (
-                                                        <tr key={q.id}>
-                                                            <td>{fmtDate(q.issueDate)}</td>
-                                                            <td className="cell-primary">{q.number || "Borrador"}</td>
-                                                            <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
-                                                            <td className="cell-amount">{fmtCents(q.totalCents)}€</td>
-                                                            <td>
-                                                                <div style={{ display: "flex", gap: 6 }}>
-                                                                    <Link href={`/quotes/${q.id}`} className="btn btn-ghost btn-sm">Ver</Link>
-                                                                    <a href={`/api/quotes/${q.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">PDF</a>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        </>
+            {/* ── Tab: Presupuestos ── */}
+            {tab === "presupuestos" && (
+                <div>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                        <span className="badge badge-info">{quotes.length} presupuestos</span>
+                    </div>
+                    {histLoading ? (
+                        <div className="loading-center"><div className="spinner" /></div>
+                    ) : quotes.length === 0 ? (
+                        <div className="card"><div className="card-body"><p style={{ color: "var(--color-text-muted)" }}>Sin presupuestos</p></div></div>
+                    ) : (
+                        <div className="table-container">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Nº Documento</th>
+                                        <th>Estado</th>
+                                        <th style={{ textAlign: "right" }}>Total</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {quotes.map((q) => {
+                                        const st = STATUS_MAP[q.status] || { label: q.status, cls: "badge-draft" };
+                                        return (
+                                            <tr key={q.id}>
+                                                <td>{fmtDate(q.issueDate)}</td>
+                                                <td className="cell-primary">{q.number || "Borrador"}</td>
+                                                <td><span className={`badge ${st.cls}`}>{st.label}</span></td>
+                                                <td className="cell-amount">{fmtCents(q.totalCents)} €</td>
+                                                <td>
+                                                    <div style={{ display: "flex", gap: 6 }}>
+                                                        <Link href={`/quotes/${q.id}`} className="btn btn-ghost btn-sm">Ver</Link>
+                                                        <a href={`/api/quotes/${q.id}/pdf`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">PDF</a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             )}
