@@ -6,7 +6,7 @@ const SECRET_KEY = new TextEncoder().encode(
 );
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health"];
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/api/cron"];
 const STATIC_PREFIXES = ["/_next", "/favicon"];
 
 function isPublicPath(pathname: string): boolean {
