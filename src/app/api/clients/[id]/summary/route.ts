@@ -4,10 +4,10 @@ import { NextResponse } from "next/server";
 // GET /api/clients/[id]/summary — Client 360° financial summary
 export async function GET(
     _request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const clientId = params.id;
+        const { id: clientId } = await params;
 
         // All invoices for this client
         const invoices = await prisma.invoice.findMany({
