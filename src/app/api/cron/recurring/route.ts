@@ -5,18 +5,27 @@ import { sendDocumentEmail, buildInvoiceEmailBody, sendNotificationEmail } from 
 import { logActivity } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
-// POST /api/cron/recurring — Cron endpoint for recurring invoices
-// Protected by CRON_SECRET (Vercel Cron or manual call)
-export async function POST(request: Request) {
-    // Validate authorization
-    const authHeader = request.headers.get("authorization");
+// Validate cron authorization — supports both Vercel Cron and manual calls
+function validateCronAuth(request: Request): boolean {
     const cronSecret = process.env.CRON_SECRET;
 
-    if (!cronSecret) {
-        return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
-    }
+    // If no CRON_SECRET configured, allow (for dev environments)
+    if (!cronSecret) return true;
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    // Vercel Cron uses this header automatically
+    const vercelCronHeader = request.headers.get("x-vercel-cron-auth");
+    if (vercelCronHeader === cronSecret) return true;
+
+    // Manual call with Bearer token
+    const authHeader = request.headers.get("authorization");
+    if (authHeader === `Bearer ${cronSecret}`) return true;
+
+    return false;
+}
+
+// POST /api/cron/recurring — Cron endpoint for recurring invoices
+export async function POST(request: Request) {
+    if (!validateCronAuth(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
