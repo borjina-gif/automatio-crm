@@ -30,6 +30,47 @@ interface ScannedInvoice {
     confidence: number;        // 0-100
 }
 
+const PROMPT = `Eres un experto en contabilidad española. Analiza esta factura y extrae TODA la información en formato JSON.
+
+REGLAS IMPORTANTES:
+- Las cantidades monetarias deben estar en EUROS (no céntimos). Ejemplo: 100.50, no 10050
+- La fecha debe estar en formato YYYY-MM-DD
+- El taxRatePercent debe ser el porcentaje de IVA (ej: 21, 10, 4, 0)
+- Si no puedes identificar un campo, pon una cadena vacía ""
+- El campo "confidence" debe ser un número del 0 al 100 indicando tu confianza en la extracción
+- El campo "notes" puede incluir cualquier información relevante que no encaje en los otros campos
+- Si hay varias líneas de factura, extrae CADA una por separado
+- El "unitPriceEuros" es el precio unitario SIN IVA
+- Si el precio incluye IVA, calcula el precio sin IVA
+
+Devuelve SOLO un JSON válido con esta estructura exacta, SIN markdown, SIN backticks, SIN explicaciones:
+
+{
+  "providerName": "Nombre del proveedor/empresa que emite la factura",
+  "providerTaxId": "NIF o CIF del proveedor",
+  "invoiceNumber": "Número de factura del proveedor",
+  "issueDate": "YYYY-MM-DD",
+  "dueDate": "YYYY-MM-DD",
+  "lines": [
+    {
+      "description": "Concepto o descripción de la línea",
+      "details": "Detalles adicionales",
+      "quantity": 1,
+      "unitPriceEuros": 100.00,
+      "taxRatePercent": 21
+    }
+  ],
+  "notes": "Información adicional relevante",
+  "confidence": 85
+}`;
+
+// Models to try in order — fallback if primary quota is exhausted
+const MODELS_TO_TRY = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+];
+
 export async function POST(request: Request) {
     try {
         if (!GEMINI_API_KEY) {
@@ -77,55 +118,59 @@ export async function POST(request: Request) {
         let mimeType = file.type;
         if (mimeType === "image/jpg") mimeType = "image/jpeg";
 
-        // ── Call Google Gemini ──────────────────────────────
+        // ── Call Google Gemini with fallback models ─────────
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-        const prompt = `Eres un experto en contabilidad española. Analiza esta factura y extrae TODA la información en formato JSON.
+        let responseText = "";
+        let lastError: any = null;
 
-REGLAS IMPORTANTES:
-- Las cantidades monetarias deben estar en EUROS (no céntimos). Ejemplo: 100.50, no 10050
-- La fecha debe estar en formato YYYY-MM-DD
-- El taxRatePercent debe ser el porcentaje de IVA (ej: 21, 10, 4, 0)
-- Si no puedes identificar un campo, pon una cadena vacía ""
-- El campo "confidence" debe ser un número del 0 al 100 indicando tu confianza en la extracción
-- El campo "notes" puede incluir cualquier información relevante que no encaje en los otros campos
-- Si hay varias líneas de factura, extrae CADA una por separado
-- El "unitPriceEuros" es el precio unitario SIN IVA
-- Si el precio incluye IVA, calcula el precio sin IVA
+        for (const modelName of MODELS_TO_TRY) {
+            try {
+                console.log(`Trying model: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
 
-Devuelve SOLO un JSON válido con esta estructura exacta, SIN markdown, SIN backticks, SIN explicaciones:
+                const result = await model.generateContent([
+                    PROMPT,
+                    {
+                        inlineData: {
+                            mimeType,
+                            data: base64Data,
+                        },
+                    },
+                ]);
 
-{
-  "providerName": "Nombre del proveedor/empresa que emite la factura",
-  "providerTaxId": "NIF o CIF del proveedor",
-  "invoiceNumber": "Número de factura del proveedor",
-  "issueDate": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD",
-  "lines": [
-    {
-      "description": "Concepto o descripción de la línea",
-      "details": "Detalles adicionales",
-      "quantity": 1,
-      "unitPriceEuros": 100.00,
-      "taxRatePercent": 21
-    }
-  ],
-  "notes": "Información adicional relevante",
-  "confidence": 85
-}`;
+                responseText = result.response.text();
+                lastError = null;
+                console.log(`Success with model: ${modelName}`);
+                break; // Success — exit the loop
+            } catch (modelErr: any) {
+                lastError = modelErr;
+                const errMsg = modelErr?.message || "";
+                console.warn(`Model ${modelName} failed:`, errMsg.substring(0, 200));
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    mimeType,
-                    data: base64Data,
-                },
-            },
-        ]);
+                // Only retry with next model if it's a quota/rate error
+                if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Too Many Requests") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+                    continue; // Try next model
+                }
+                // For other errors, don't retry — break
+                break;
+            }
+        }
 
-        const responseText = result.response.text();
+        if (lastError || !responseText) {
+            const errMsg = lastError?.message || "";
+            if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Too Many Requests") || errMsg.includes("RESOURCE_EXHAUSTED")) {
+                return NextResponse.json(
+                    { error: "Se ha superado la cuota de la API de Google Gemini. Espera unos minutos e inténtalo de nuevo, o activa la facturación en Google AI Studio." },
+                    { status: 429 }
+                );
+            }
+            console.error("All models failed:", lastError);
+            return NextResponse.json(
+                { error: "Error al procesar la factura con IA. Inténtalo de nuevo." },
+                { status: 500 }
+            );
+        }
 
         // Parse the JSON response — Gemini sometimes wraps in markdown
         let jsonStr = responseText.trim();
