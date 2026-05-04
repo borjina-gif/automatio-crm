@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNotification } from "@/components/NotificationContext";
-import ProviderModal from "@/components/ProviderModal";
+import ProviderModal, { type ProviderModalInitialData } from "@/components/ProviderModal";
 import InvoiceScanner, { type ScannedInvoiceData } from "@/components/InvoiceScanner";
 
 interface Provider {
@@ -26,6 +26,11 @@ interface LineItem {
     unitPriceCents: string;
     taxId: string;
     taxRate: number;
+}
+
+interface ScannedProviderInfo {
+    name: string;
+    taxId: string;
 }
 
 function newLine(): LineItem {
@@ -120,6 +125,8 @@ export default function NewPurchasePage() {
     const [saving, setSaving] = useState(false);
     const [showProviderModal, setShowProviderModal] = useState(false);
     const [showScanner, setShowScanner] = useState(true);
+    const [scannedProviderInfo, setScannedProviderInfo] = useState<ScannedProviderInfo | null>(null);
+    const [providerModalInitial, setProviderModalInitial] = useState<ProviderModalInitialData | undefined>(undefined);
 
     useEffect(() => {
         fetch("/api/providers").then((r) => r.json()).then((d) => setProviders(Array.isArray(d) ? d : []));
@@ -170,12 +177,14 @@ export default function NewPurchasePage() {
             setLines(scannedLines);
         }
 
-        // If provider wasn't matched, add it to the notes
+        // If provider wasn't matched, store the scanned info so we can offer to create it
         if (!matchedProvider && data.providerName) {
-            setNotes((prev) => {
-                const providerInfo = `Proveedor detectado: ${data.providerName}${data.providerTaxId ? ` (${data.providerTaxId})` : ''}`;
-                return prev ? `${providerInfo}\n${prev}` : providerInfo;
+            setScannedProviderInfo({
+                name: data.providerName,
+                taxId: data.providerTaxId || "",
             });
+        } else {
+            setScannedProviderInfo(null);
         }
 
         setShowScanner(false);
@@ -296,6 +305,65 @@ export default function NewPurchasePage() {
                     onError={(msg) => showError(msg)}
                 />
             )}
+
+            {/* Banner: scanned provider not found */}
+            {scannedProviderInfo && !providerId && (
+                <div style={{
+                    padding: '14px 18px',
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.14))',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    marginBottom: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    flexWrap: 'wrap',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 200 }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        <div>
+                            <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: 'var(--text-primary, #111827)' }}>
+                                Proveedor no encontrado: <span style={{ color: '#d97706' }}>{scannedProviderInfo.name}</span>
+                            </p>
+                            {scannedProviderInfo.taxId && (
+                                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
+                                    NIF/CIF detectado: {scannedProviderInfo.taxId}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => {
+                                setProviderModalInitial({
+                                    name: scannedProviderInfo.name,
+                                    taxId: scannedProviderInfo.taxId,
+                                });
+                                setShowProviderModal(true);
+                            }}
+                            style={{ whiteSpace: 'nowrap' }}
+                        >
+                            Crear proveedor
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setScannedProviderInfo(null)}
+                            style={{ whiteSpace: 'nowrap' }}
+                        >
+                            Ignorar
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-body">
                     <div className="form-row">
@@ -305,7 +373,10 @@ export default function NewPurchasePage() {
                                 <button
                                     type="button"
                                     className="btn btn-ghost btn-sm"
-                                    onClick={() => setShowProviderModal(true)}
+                                    onClick={() => {
+                                        setProviderModalInitial(undefined);
+                                        setShowProviderModal(true);
+                                    }}
                                     style={{ padding: '0 4px', fontSize: '11.5px', color: 'var(--color-primary)' }}
                                 >
                                     + Nuevo Proveedor
@@ -440,11 +511,17 @@ export default function NewPurchasePage() {
             </div>
             <ProviderModal
                 isOpen={showProviderModal}
-                onClose={() => setShowProviderModal(false)}
+                onClose={() => {
+                    setShowProviderModal(false);
+                    setProviderModalInitial(undefined);
+                }}
                 onSuccess={(provider) => {
                     setProviders((prev) => [...prev, provider]);
                     setProviderId(provider.id);
+                    setScannedProviderInfo(null);
+                    setProviderModalInitial(undefined);
                 }}
+                initialData={providerModalInitial}
             />
         </>
     );
