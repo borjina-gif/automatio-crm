@@ -42,6 +42,8 @@ interface PurchaseInvoice {
     dueDate: string | null;
     subtotalCents: number;
     taxCents: number;
+    retentionRate: number;
+    retentionCents: number;
     totalCents: number;
     paidCents: number;
     notes: string | null;
@@ -603,8 +605,14 @@ export default function PurchaseDetailPage() {
                                 </div>
                                 <div className="totals-row">
                                     <span>IVA</span>
-                                    <span className="cell-mono">{fmtCents(purchase.taxCents)}</span>
+                                    <span className="cell-mono" style={{ color: 'var(--color-success, #22c55e)' }}>+{fmtCents(purchase.taxCents)}</span>
                                 </div>
+                                {purchase.retentionCents > 0 && (
+                                    <div className="totals-row">
+                                        <span>Retención IRPF ({Number(purchase.retentionRate)}%)</span>
+                                        <span className="cell-mono" style={{ color: 'var(--color-error, #ef4444)' }}>-{fmtCents(purchase.retentionCents)}</span>
+                                    </div>
+                                )}
                                 <div className="totals-row totals-total">
                                     <span>Total</span>
                                     <span className="cell-mono">{fmtCents(purchase.totalCents)}</span>

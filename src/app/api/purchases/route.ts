@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { providerId, providerInvoiceNumber, notes, issueDate, dueDate, lines } = body;
+        const { providerId, providerInvoiceNumber, notes, issueDate, dueDate, lines, retentionRate } = body;
 
         if (!providerId) {
             return NextResponse.json({ error: "El proveedor es obligatorio" }, { status: 400 });
@@ -51,10 +51,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Empresa no configurada" }, { status: 500 });
         }
 
-        // Calculate line totals
+        // Calculate line totals — input is now in EUROS, stored as CENTS
         const processedLines = (lines || []).map((line: any, idx: number) => {
             const qty = parseFloat(line.quantity) || 0;
-            const unitCents = parseInt(line.unitPriceCents) || 0;
+
+            // Accept both unitPriceEuros (new) and unitPriceCents (legacy)
+            let unitCents: number;
+            if (line.unitPriceEuros !== undefined) {
+                unitCents = Math.round((parseFloat(line.unitPriceEuros) || 0) * 100);
+            } else {
+                unitCents = parseInt(line.unitPriceCents) || 0;
+            }
+
             const lineSubtotalCents = Math.round(qty * unitCents);
             const taxRate = parseFloat(line.taxRate) || 0;
             const lineTaxCents = Math.round(lineSubtotalCents * taxRate / 100);
@@ -75,7 +83,13 @@ export async function POST(request: Request) {
 
         const subtotalCents = processedLines.reduce((sum: number, l: any) => sum + l.lineSubtotalCents, 0);
         const taxCents = processedLines.reduce((sum: number, l: any) => sum + l.lineTaxCents, 0);
-        const totalCents = subtotalCents + taxCents;
+
+        // Retention (IRPF) — applied on the subtotal
+        const parsedRetentionRate = parseFloat(retentionRate) || 0;
+        const retentionCents = Math.round(subtotalCents * parsedRetentionRate / 100);
+
+        // Total = subtotal + IVA - retention
+        const totalCents = subtotalCents + taxCents - retentionCents;
 
         const purchase = await prisma.purchaseInvoice.create({
             data: {
@@ -88,6 +102,8 @@ export async function POST(request: Request) {
                 dueDate: dueDate ? new Date(dueDate) : null,
                 subtotalCents,
                 taxCents,
+                retentionRate: parsedRetentionRate,
+                retentionCents,
                 totalCents,
                 lines: {
                     create: processedLines,

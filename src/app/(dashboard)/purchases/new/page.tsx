@@ -16,6 +16,7 @@ interface Tax {
     id: string;
     name: string;
     rate: number;
+    type: string;
 }
 
 interface LineItem {
@@ -23,7 +24,7 @@ interface LineItem {
     description: string;
     details: string;
     quantity: string;
-    unitPriceCents: string;
+    unitPriceEuros: string;
     taxId: string;
     taxRate: number;
 }
@@ -39,11 +40,21 @@ function newLine(): LineItem {
         description: "",
         details: "",
         quantity: "1",
-        unitPriceCents: "0",
+        unitPriceEuros: "",
         taxId: "",
         taxRate: 0,
     };
 }
+
+// ── Retention options (IRPF) ────────────────────────────
+const RETENTION_OPTIONS = [
+    { label: "Sin retención", value: 0 },
+    { label: "IRPF 1%", value: 1 },
+    { label: "IRPF 2%", value: 2 },
+    { label: "IRPF 7%", value: 7 },
+    { label: "IRPF 15%", value: 15 },
+    { label: "IRPF 19%", value: 19 },
+];
 
 function LineItemEditor({
     line,
@@ -56,57 +67,85 @@ function LineItemEditor({
     updateLine: (key: string, field: string, value: string) => void;
     removeLine: (key: string) => void;
 }) {
+    const ivaTaxes = taxes.filter(t => t.type === "IVA" || t.type === "EXENTO" || t.type === "RECARGO_EQUIVALENCIA" || t.type === "INTRACOMUNITARIO");
+
     const qty = parseFloat(line.quantity) || 0;
-    const unit = parseInt(line.unitPriceCents) || 0;
-    const sub = Math.round(qty * unit);
-    const tax = Math.round(sub * line.taxRate / 100);
-    const total = sub + tax;
+    const unitEuros = parseFloat(line.unitPriceEuros) || 0;
+    const subtotalEuros = qty * unitEuros;
+    const taxEuros = subtotalEuros * line.taxRate / 100;
+    const totalEuros = subtotalEuros + taxEuros;
 
     return (
         <div className="line-row" key={line.key}>
-            <input
-                className="line-input line-input-desc"
-                placeholder="Concepto"
-                value={line.description}
-                onChange={(e) => updateLine(line.key, "description", e.target.value)}
-                style={{ fontWeight: 600 }}
-            />
-            <textarea
-                className="line-input line-details"
-                placeholder="Desc"
-                value={line.details}
-                onChange={(e) => updateLine(line.key, "details", e.target.value)}
-                rows={1}
-            />
-            <input
-                className="line-input line-input-sm"
-                type="number"
-                placeholder="Ud."
-                value={line.quantity}
-                onChange={(e) => updateLine(line.key, "quantity", e.target.value)}
-                min="0"
-                step="1"
-            />
-            <input
-                className="line-input line-input-sm"
-                type="number"
-                placeholder="Precio (cts)"
-                value={line.unitPriceCents}
-                onChange={(e) => updateLine(line.key, "unitPriceCents", e.target.value)}
-                min="0"
-            />
-            <select
-                className="line-input"
-                value={line.taxId}
-                onChange={(e) => updateLine(line.key, "taxId", e.target.value)}
-            >
-                <option value="">Sin IVA</option>
-                {taxes.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-            </select>
-            <span className="line-total">{(total / 100).toFixed(2)} €</span>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeLine(line.key)}>✕</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '2 1 200px', minWidth: 180 }}>
+                <input
+                    className="line-input"
+                    placeholder="Concepto (ej: Servicio de diseño web)"
+                    value={line.description}
+                    onChange={(e) => updateLine(line.key, "description", e.target.value)}
+                    style={{ fontWeight: 600 }}
+                />
+                <textarea
+                    className="line-input line-details"
+                    placeholder="Descripción adicional (opcional)"
+                    value={line.details}
+                    onChange={(e) => updateLine(line.key, "details", e.target.value)}
+                    rows={1}
+                />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 70, flex: '0 0 80px' }}>
+                <label className="line-field-label">Cantidad</label>
+                <input
+                    className="line-input line-input-sm"
+                    type="number"
+                    placeholder="1"
+                    value={line.quantity}
+                    onChange={(e) => updateLine(line.key, "quantity", e.target.value)}
+                    min="0"
+                    step="1"
+                />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 100, flex: '0 0 110px' }}>
+                <label className="line-field-label">Precio (€)</label>
+                <input
+                    className="line-input line-input-sm"
+                    type="number"
+                    placeholder="0.00"
+                    value={line.unitPriceEuros}
+                    onChange={(e) => updateLine(line.key, "unitPriceEuros", e.target.value)}
+                    min="0"
+                    step="0.01"
+                />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 100, flex: '0 0 130px' }}>
+                <label className="line-field-label">IVA</label>
+                <select
+                    className="line-input"
+                    value={line.taxId}
+                    onChange={(e) => updateLine(line.key, "taxId", e.target.value)}
+                >
+                    <option value="">Sin IVA</option>
+                    {ivaTaxes.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 90, flex: '0 0 90px', textAlign: 'right' }}>
+                <label className="line-field-label">Total línea</label>
+                <span className="line-total">{totalEuros.toFixed(2)} €</span>
+            </div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeLine(line.key)} style={{ alignSelf: 'center', marginTop: 16 }}>✕</button>
+
+            <style jsx>{`
+                .line-field-label {
+                    font-size: 10px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: var(--text-tertiary, #9ca3af);
+                    margin: 0;
+                }
+            `}</style>
         </div>
     );
 }
@@ -127,6 +166,7 @@ export default function NewPurchasePage() {
     const [showScanner, setShowScanner] = useState(true);
     const [scannedProviderInfo, setScannedProviderInfo] = useState<ScannedProviderInfo | null>(null);
     const [providerModalInitial, setProviderModalInitial] = useState<ProviderModalInitialData | undefined>(undefined);
+    const [retentionRate, setRetentionRate] = useState(0);
 
     useEffect(() => {
         fetch("/api/providers").then((r) => r.json()).then((d) => setProviders(Array.isArray(d) ? d : []));
@@ -156,9 +196,6 @@ export default function NewPurchasePage() {
         // Build line items from scanned data
         if (data.lines.length > 0) {
             const scannedLines: LineItem[] = data.lines.map((sl) => {
-                // Convert euros to cents
-                const unitPriceCents = Math.round(sl.unitPriceEuros * 100);
-
                 // Find matching tax by rate
                 const matchedTax = taxes.find(
                     (t) => Math.abs(t.rate - sl.taxRatePercent) < 0.5
@@ -169,7 +206,7 @@ export default function NewPurchasePage() {
                     description: sl.description,
                     details: sl.details || "",
                     quantity: String(sl.quantity),
-                    unitPriceCents: String(unitPriceCents),
+                    unitPriceEuros: String(sl.unitPriceEuros),
                     taxId: matchedTax?.id || "",
                     taxRate: matchedTax?.rate || sl.taxRatePercent,
                 };
@@ -208,21 +245,22 @@ export default function NewPurchasePage() {
         setLines((prev) => prev.filter((l) => l.key !== key));
     }
 
-    // Calculate totals
-    const subtotalCents = lines.reduce((sum, l) => {
+    // ── Calculate totals (in euros for display) ────────────
+    const subtotalEuros = lines.reduce((sum, l) => {
         const qty = parseFloat(l.quantity) || 0;
-        const unit = parseInt(l.unitPriceCents) || 0;
-        return sum + Math.round(qty * unit);
+        const unit = parseFloat(l.unitPriceEuros) || 0;
+        return sum + qty * unit;
     }, 0);
 
-    const taxCents = lines.reduce((sum, l) => {
+    const taxEuros = lines.reduce((sum, l) => {
         const qty = parseFloat(l.quantity) || 0;
-        const unit = parseInt(l.unitPriceCents) || 0;
-        const sub = Math.round(qty * unit);
-        return sum + Math.round(sub * l.taxRate / 100);
+        const unit = parseFloat(l.unitPriceEuros) || 0;
+        const sub = qty * unit;
+        return sum + sub * l.taxRate / 100;
     }, 0);
 
-    const totalCents = subtotalCents + taxCents;
+    const retentionEuros = subtotalEuros * retentionRate / 100;
+    const totalEuros = subtotalEuros + taxEuros - retentionEuros;
 
     async function handleSave() {
         if (!providerId) {
@@ -246,11 +284,12 @@ export default function NewPurchasePage() {
                     issueDate: issueDate || null,
                     dueDate: dueDate || null,
                     notes: notes || null,
+                    retentionRate,
                     lines: lines.map((l) => ({
                         description: l.description,
                         details: l.details || null,
                         quantity: l.quantity,
-                        unitPriceCents: l.unitPriceCents,
+                        unitPriceEuros: l.unitPriceEuros,
                         taxId: l.taxId || null,
                         taxRate: l.taxRate,
                     })),
@@ -431,7 +470,7 @@ export default function NewPurchasePage() {
             {/* Lines */}
             <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-header">
-                    <h3 style={{ margin: 0 }}>Líneas</h3>
+                    <h3 style={{ margin: 0 }}>Líneas de factura</h3>
                     <button
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -441,14 +480,6 @@ export default function NewPurchasePage() {
                     </button>
                 </div>
                 <div className="card-body" style={{ padding: 0 }}>
-                    <div className="lines-header">
-                        <span className="line-input-desc">Descripción</span>
-                        <span className="line-input-sm">Uds</span>
-                        <span className="line-input-sm">Precio (cts)</span>
-                        <span>IVA</span>
-                        <span className="line-total">Total</span>
-                        <span style={{ width: 30 }}></span>
-                    </div>
                     {lines.map((line) => (
                         <LineItemEditor
                             key={line.key}
@@ -458,24 +489,55 @@ export default function NewPurchasePage() {
                             removeLine={removeLine}
                         />
                     ))}
+                    {lines.length === 0 && (
+                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary, #9ca3af)', fontSize: 13 }}>
+                            No hay líneas. Haz clic en &quot;+ Añadir línea&quot; para empezar.
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Totals */}
+            {/* Retention + Totals */}
             <div className="card" style={{ marginBottom: 20 }}>
                 <div className="card-body">
-                    <div className="totals-grid">
-                        <div className="totals-row">
-                            <span>Base imponible</span>
-                            <span className="cell-mono">{(subtotalCents / 100).toFixed(2)} €</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+                        {/* Retention selector */}
+                        <div className="form-group" style={{ minWidth: 200, maxWidth: 280, margin: 0 }}>
+                            <label className="form-label">Retención IRPF</label>
+                            <select
+                                className="form-input"
+                                value={retentionRate}
+                                onChange={(e) => setRetentionRate(parseFloat(e.target.value))}
+                            >
+                                {RETENTION_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                            <p style={{ fontSize: 11, color: 'var(--text-tertiary, #9ca3af)', margin: '4px 0 0' }}>
+                                Se aplica sobre la base imponible
+                            </p>
                         </div>
-                        <div className="totals-row">
-                            <span>IVA</span>
-                            <span className="cell-mono">{(taxCents / 100).toFixed(2)} €</span>
-                        </div>
-                        <div className="totals-row totals-total">
-                            <span>Total</span>
-                            <span className="cell-mono">{(totalCents / 100).toFixed(2)} €</span>
+
+                        {/* Totals */}
+                        <div className="totals-grid" style={{ minWidth: 250 }}>
+                            <div className="totals-row">
+                                <span>Base imponible</span>
+                                <span className="cell-mono">{subtotalEuros.toFixed(2)} €</span>
+                            </div>
+                            <div className="totals-row">
+                                <span>IVA</span>
+                                <span className="cell-mono" style={{ color: 'var(--color-success, #22c55e)' }}>+{taxEuros.toFixed(2)} €</span>
+                            </div>
+                            {retentionRate > 0 && (
+                                <div className="totals-row">
+                                    <span>Retención IRPF ({retentionRate}%)</span>
+                                    <span className="cell-mono" style={{ color: 'var(--color-error, #ef4444)' }}>-{retentionEuros.toFixed(2)} €</span>
+                                </div>
+                            )}
+                            <div className="totals-row totals-total">
+                                <span>Total</span>
+                                <span className="cell-mono">{totalEuros.toFixed(2)} €</span>
+                            </div>
                         </div>
                     </div>
                 </div>

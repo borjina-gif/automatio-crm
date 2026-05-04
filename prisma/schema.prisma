@@ -419,6 +419,8 @@ model PurchaseInvoice {
   pdfUrl                  String?               @map("pdf_url")
   subtotalCents           Int                   @default(0) @map("subtotal_cents")
   taxCents                Int                   @default(0) @map("tax_cents")
+  retentionRate           Decimal               @default(0) @map("retention_rate") @db.Decimal(5, 2)
+  retentionCents          Int                   @default(0) @map("retention_cents")
   totalCents              Int                   @default(0) @map("total_cents")
   paidCents               Int                   @default(0) @map("paid_cents")
   notes                   String?
